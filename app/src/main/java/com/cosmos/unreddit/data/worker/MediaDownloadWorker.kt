@@ -36,6 +36,7 @@ import com.cosmos.unreddit.util.extension.showNotification
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -51,8 +52,8 @@ import java.util.Date
 class MediaDownloadWorker @AssistedInject constructor (
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CoroutineWorker(appContext, params) {
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
     private val filename: String
         get() = applicationContext.getString(R.string.app_name) +
