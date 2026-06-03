@@ -24,30 +24,36 @@ object Dependencies {
         const val paging = "3.1.1"
 
         const val work = "2.7.1"
- 
+
         const val material = "1.7.0"
- 
+
         const val browser = "1.4.0"
- 
+
         const val splashscreen = "1.0.0"
- 
+
         const val touchImageView = "3.0.3"
- 
+
         const val exoPlayer = "2.18.1"
- 
+
         const val retrofit = "2.9.0"
- 
+
         const val moshi = "1.14.0"
- 
+
         const val okio = "3.2.0"
- 
+
         const val coil = "2.2.2"
- 
+
         const val jsoup = "1.15.3"
- 
+
         const val drawer = "1.0.3"
- 
+
         const val coroutines = "1.4.1"
+
+        const val impersonatorBctls = "1.0.12"
+
+        const val coroutinesTest = "1.6.4"
+        const val mockWebServer = "4.10.0"
+        const val mockk = "1.13.3"
 
         const val jUnit = "4.13.2"
         const val test = "1.1.4"

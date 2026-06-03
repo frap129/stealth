@@ -132,6 +132,8 @@ dependencies {
 
     implementation("com.squareup.okio:okio:${Dependencies.Versions.moshi}")
 
+    implementation("com.github.zhkl0228:impersonator-bctls:${Dependencies.Versions.impersonatorBctls}")
+
     implementation("io.coil-kt:coil:${Dependencies.Versions.coil}")
     implementation("io.coil-kt:coil-gif:${Dependencies.Versions.coil}")
 
@@ -144,6 +146,9 @@ dependencies {
     implementation("com.drakeet.drawer:drawer:${Dependencies.Versions.drawer}")
 
     testImplementation("junit:junit:${Dependencies.Versions.jUnit}")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Dependencies.Versions.coroutinesTest}")
+    testImplementation("com.squareup.okhttp3:mockwebserver:${Dependencies.Versions.mockWebServer}")
+    testImplementation("io.mockk:mockk:${Dependencies.Versions.mockk}")
 
     androidTestImplementation("androidx.test:runner:${Dependencies.Versions.testRunner}")
     androidTestImplementation("androidx.test.ext:junit:${Dependencies.Versions.test}")
