@@ -99,7 +99,7 @@ class PostDetailsFragment : BaseFragment(),
             preferencesRepository.getContentPreferences().first()
         }
 
-        if (savedInstanceState == null) {
+        if (viewModel.permalink.value == null) {
             handleArguments()
         }
 
