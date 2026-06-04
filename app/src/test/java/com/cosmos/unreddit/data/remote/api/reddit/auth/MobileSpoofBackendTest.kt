@@ -37,6 +37,21 @@ class MobileSpoofBackendTest {
     }
 
     @Test
+    fun `default token url uses reddit web host`() {
+        val client = OkHttpClient.Builder().build()
+        val moshi = Moshi.Builder().build()
+        val defaultBackend = MobileSpoofBackend(client, moshi)
+
+        val field = MobileSpoofBackend::class.java.getDeclaredField("tokenUrl")
+        field.isAccessible = true
+
+        assertEquals(
+            "https://www.reddit.com/auth/v2/oauth/access-token/loid",
+            field.get(defaultBackend),
+        )
+    }
+
+    @Test
     fun `fetchToken returns Success on 200 with valid JSON`() =
         runTest {
             server.enqueue(

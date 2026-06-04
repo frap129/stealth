@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.concurrent.TimeUnit
@@ -145,6 +146,7 @@ object NetworkModule {
         OkHttpClient
             .Builder()
             .sslSocketFactory(RedditTlsFactory.socketFactory(), RedditTlsFactory.trustManager())
+            .protocols(listOf(Protocol.HTTP_1_1))
             .addInterceptor(redditAuthInterceptor)
             .addInterceptor(RawJsonInterceptor())
             .connectTimeout(TIMEOUT.first, TIMEOUT.second)

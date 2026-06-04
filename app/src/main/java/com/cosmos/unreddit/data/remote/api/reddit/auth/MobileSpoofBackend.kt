@@ -1,5 +1,4 @@
 package com.cosmos.unreddit.data.remote.api.reddit.auth
-
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,7 +17,7 @@ internal class MobileSpoofBackend(
 
     companion object {
         private const val CLIENT_ID = "ohXpoqrZYub1kg"
-        private const val TOKEN_URL = "https://accounts.reddit.com/auth/v2/oauth/access-token/loid"
+        private const val TOKEN_URL = "https://www.reddit.com/auth/v2/oauth/access-token/loid"
     }
 
     override suspend fun fetchToken(device: RedditDevice): TokenResult =

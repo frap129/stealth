@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -191,6 +192,7 @@ class RedditTokenManager
                 OkHttpClient
                     .Builder()
                     .sslSocketFactory(RedditTlsFactory.socketFactory(), RedditTlsFactory.trustManager())
+                    .protocols(listOf(Protocol.HTTP_1_1))
                     .connectTimeout(15, TimeUnit.SECONDS)
                     .readTimeout(15, TimeUnit.SECONDS)
                     .writeTimeout(15, TimeUnit.SECONDS)
