@@ -13,7 +13,6 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface RedditApi {
-
     //region Subreddit
 
     @GET("/r/{subreddit}/{sort}")
@@ -22,11 +21,13 @@ interface RedditApi {
         @Path("sort") sort: Sort,
         @Query("t") timeSorting: TimeSorting?,
         @Query("after") after: String? = null,
-        @Query("geo_filter") geoFilter: String? = "GLOBAL"
+        @Query("geo_filter") geoFilter: String? = "GLOBAL",
     ): ResponseBody
 
     @GET("/r/{subreddit}/about")
-    suspend fun getSubredditInfo(@Path("subreddit") subreddit: String): ResponseBody
+    suspend fun getSubredditInfo(
+        @Path("subreddit") subreddit: String,
+    ): ResponseBody
 
     @GET("/r/{subreddit}/search?restrict_sr=1&include_over_18=1")
     suspend fun searchInSubreddit(
@@ -34,11 +35,13 @@ interface RedditApi {
         @Query("q") query: String,
         @Query("sort") sort: Sort?,
         @Query("t") timeSorting: TimeSorting?,
-        @Query("after") after: String? = null
+        @Query("after") after: String? = null,
     ): ResponseBody
 
     @GET("/r/{subreddit}/about/rules")
-    fun getSubredditRules(@Path("subreddit") subreddit: String): Call<Child>
+    fun getSubredditRules(
+        @Path("subreddit") subreddit: String,
+    ): Call<Child>
 
     //endregion
 
@@ -46,26 +49,28 @@ interface RedditApi {
     suspend fun getPost(
         @Path("permalink", encoded = true) permalink: String,
         @Query("limit") limit: Int? = null,
-        @Query("sort") sort: Sort
+        @Query("sort") sort: Sort,
     ): ResponseBody
 
     @GET("/api/morechildren?api_type=json")
     suspend fun getMoreChildren(
         @Query("children") children: String,
-        @Query("link_id") linkId: String
+        @Query("link_id") linkId: String,
     ): ResponseBody
 
     //region User
 
     @GET("/user/{user}/about")
-    suspend fun getUserInfo(@Path("user") user: String): ResponseBody
+    suspend fun getUserInfo(
+        @Path("user") user: String,
+    ): ResponseBody
 
     @GET("/user/{user}/submitted/")
     suspend fun getUserPosts(
         @Path("user") user: String,
         @Query("sort") sort: Sort,
         @Query("t") timeSorting: TimeSorting?,
-        @Query("after") after: String? = null
+        @Query("after") after: String? = null,
     ): ResponseBody
 
     @GET("/user/{user}/comments/")
@@ -73,7 +78,7 @@ interface RedditApi {
         @Path("user") user: String,
         @Query("sort") sort: Sort,
         @Query("t") timeSorting: TimeSorting?,
-        @Query("after") after: String? = null
+        @Query("after") after: String? = null,
     ): ResponseBody
 
     //endregion
@@ -85,7 +90,7 @@ interface RedditApi {
         @Query("q") query: String,
         @Query("sort") sort: Sort?,
         @Query("t") timeSorting: TimeSorting?,
-        @Query("after") after: String? = null
+        @Query("after") after: String? = null,
     ): ResponseBody
 
     @GET("/search?type=user&include_over_18=1")
@@ -93,7 +98,7 @@ interface RedditApi {
         @Query("q") query: String,
         @Query("sort") sort: Sort?,
         @Query("t") timeSorting: TimeSorting?,
-        @Query("after") after: String? = null
+        @Query("after") after: String? = null,
     ): ResponseBody
 
     @GET("/search?type=sr&include_over_18=1")
@@ -101,16 +106,20 @@ interface RedditApi {
         @Query("q") query: String,
         @Query("sort") sort: Sort?,
         @Query("t") timeSorting: TimeSorting?,
-        @Query("after") after: String? = null
+        @Query("after") after: String? = null,
     ): ResponseBody
 
     @POST("/over18")
-    suspend fun consentOver18(@Body body: RequestBody, @Query("dest") dest: String): ResponseBody
+    suspend fun consentOver18(
+        @Body body: RequestBody,
+        @Query("dest") dest: String,
+    ): ResponseBody
 
     //endregion
 
     companion object {
         const val BASE_URL = "https://www.reddit.com/"
         const val BASE_URL_OLD = "https://old.reddit.com/"
+        const val BASE_URL_OAUTH = "https://oauth.reddit.com/"
     }
 }
