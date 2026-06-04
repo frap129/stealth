@@ -23,7 +23,8 @@ class RedditAuthInterceptor
         override fun intercept(chain: Interceptor.Chain): Response {
             val session = runBlocking { tokenManager.getOrAcquireSession() }
 
-            val response = chain.proceed(buildAuthenticatedRequest(chain, session))
+            val request = buildAuthenticatedRequest(chain, session)
+            val response = chain.proceed(request)
 
             if (response.code == 401) {
                 response.close()

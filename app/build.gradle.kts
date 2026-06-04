@@ -59,7 +59,7 @@ android {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             signingConfig = signingConfigs.getByName("release")
         }
@@ -72,6 +72,13 @@ android {
     buildFeatures {
         viewBinding = true
         dataBinding = true
+    }
+
+    packagingOptions {
+        resources {
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+            excludes += "META-INF/versions/11/OSGI-INF/MANIFEST.MF"
+        }
     }
 
     compileOptions {
@@ -132,7 +139,14 @@ dependencies {
 
     implementation("com.squareup.okio:okio:${Dependencies.Versions.moshi}")
 
-    implementation("com.github.zhkl0228:impersonator-bctls:${Dependencies.Versions.impersonatorBctls}")
+    implementation("com.github.zhkl0228:impersonator-bctls:${Dependencies.Versions.impersonatorBctls}") {
+        exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+        exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
+        exclude(group = "org.slf4j", module = "slf4j-api")
+    }
+    implementation("org.bouncycastle:bcprov-jdk15to18:1.84")
+    implementation("org.bouncycastle:bcutil-jdk15to18:1.84")
+    implementation("org.slf4j:slf4j-api:1.7.36")
 
     implementation("io.coil-kt:coil:${Dependencies.Versions.coil}")
     implementation("io.coil-kt:coil-gif:${Dependencies.Versions.coil}")

@@ -1,5 +1,4 @@
 package com.cosmos.unreddit.data.remote.api.reddit.auth
-
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
