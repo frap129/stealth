@@ -17,7 +17,7 @@ interface RedditApi {
 
     @GET("/r/{subreddit}/{sort}")
     suspend fun getSubreddit(
-        @Path("subreddit") subreddit: String,
+        @Path("subreddit", encoded = true) subreddit: String,
         @Path("sort") sort: Sort,
         @Query("t") timeSorting: TimeSorting?,
         @Query("after") after: String? = null,

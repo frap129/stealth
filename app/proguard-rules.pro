@@ -25,3 +25,35 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+
+-keep class org.bouncycastle.jsse.provider.ImportX509TrustManager_7 {
+    <init>(javax.net.ssl.X509ExtendedTrustManager);
+}
+
+-keep class org.bouncycastle.jsse.provider.ExportX509TrustManager_7 {
+    <init>(org.bouncycastle.jsse.BCX509ExtendedTrustManager);
+}
+
+-keep class org.bouncycastle.jsse.provider.ImportSSLSession_7 {
+    <init>(javax.net.ssl.ExtendedSSLSession);
+}
+
+-keep class org.bouncycastle.jsse.provider.ImportSSLSession_8 {
+    <init>(javax.net.ssl.ExtendedSSLSession);
+}
+
+-keep class org.bouncycastle.jsse.provider.ExportSSLSession_7 {
+    <init>(org.bouncycastle.jsse.BCExtendedSSLSession);
+}
+
+-keep class org.bouncycastle.jsse.provider.ExportSSLSession_8 {
+    <init>(org.bouncycastle.jsse.BCExtendedSSLSession);
+}
+
+-dontwarn org.conscrypt.Conscrypt$Version
+-dontwarn org.conscrypt.Conscrypt
+-dontwarn org.conscrypt.ConscryptHostnameVerifier
+-dontwarn org.openjsse.javax.net.ssl.SSLParameters
+-dontwarn org.openjsse.javax.net.ssl.SSLSocket
+-dontwarn org.openjsse.net.ssl.OpenJSSE
+-dontwarn org.slf4j.impl.StaticLoggerBinder
