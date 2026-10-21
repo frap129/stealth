@@ -1,6 +1,7 @@
 package com.cosmos.unreddit.di
 
 import com.cosmos.unreddit.data.remote.RawJsonInterceptor
+import com.cosmos.unreddit.data.remote.RedditCommentsPathInterceptor
 import com.cosmos.unreddit.data.remote.TargetRedditInterceptor
 import com.cosmos.unreddit.data.remote.api.gfycat.GfycatApi
 import com.cosmos.unreddit.data.remote.api.imgur.ImgurApi
@@ -148,6 +149,7 @@ object NetworkModule {
             .sslSocketFactory(RedditTlsFactory.socketFactory(), RedditTlsFactory.trustManager())
             .protocols(listOf(Protocol.HTTP_1_1))
             .addInterceptor(redditAuthInterceptor)
+            .addInterceptor(RedditCommentsPathInterceptor())
             .addInterceptor(RawJsonInterceptor())
             .connectTimeout(TIMEOUT.first, TIMEOUT.second)
             .readTimeout(TIMEOUT.first, TIMEOUT.second)

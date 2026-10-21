@@ -1,5 +1,6 @@
 package com.cosmos.unreddit.di
 
+import com.cosmos.unreddit.data.remote.RedditCommentsPathInterceptor
 import com.cosmos.unreddit.data.remote.api.reddit.RedditAuthInterceptor
 import com.cosmos.unreddit.data.remote.api.reddit.auth.RedditTokenManager
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +22,6 @@ class NetworkModuleTest {
             )
 
         assertEquals(listOf(Protocol.HTTP_1_1), client.protocols)
-        assertTrue(client.interceptors.isNotEmpty())
+        assertTrue(client.interceptors.any { it is RedditCommentsPathInterceptor })
     }
 }
