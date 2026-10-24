@@ -36,8 +36,9 @@ sealed interface BaseRedditSource {
     ): List<Listing>
 
     suspend fun getMoreChildren(
-        children: String,
-        linkId: String
+        cursor: String,
+        linkId: String,
+        sortType: String
     ): MoreChildren
 
     //region User

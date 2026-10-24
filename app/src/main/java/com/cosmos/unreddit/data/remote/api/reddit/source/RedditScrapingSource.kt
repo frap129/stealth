@@ -74,7 +74,11 @@ class RedditScrapingSource @Inject constructor(
         return listOf(post.await(), comments.await())
     }
 
-    override suspend fun getMoreChildren(children: String, linkId: String): MoreChildren {
+    override suspend fun getMoreChildren(
+        cursor: String,
+        linkId: String,
+        sortType: String
+    ): MoreChildren {
         // TODO
         return MoreChildren(JsonMore(Data(emptyList())))
     }

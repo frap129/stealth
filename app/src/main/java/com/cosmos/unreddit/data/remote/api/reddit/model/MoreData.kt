@@ -21,5 +21,11 @@ class MoreData (
     val parentId: String,
 
     @Json(name = "children")
-    val children: MutableList<String>
+    val children: MutableList<String>,
+
+    @Json(name = "cursor")
+    val cursor: String? = null,
+
+    @Json(name = "sort_type")
+    val sortType: String? = null
 )

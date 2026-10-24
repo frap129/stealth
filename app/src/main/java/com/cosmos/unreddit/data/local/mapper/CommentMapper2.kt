@@ -75,7 +75,9 @@ class CommentMapper2 @Inject constructor(
                 parentId,
                 CommentUtil.getCommentIndicator(depth),
                 name,
-                depth ?: 0
+                depth ?: 0,
+                cursor = cursor,
+                sortType = sortType
             )
         }
     }
