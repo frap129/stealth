@@ -153,36 +153,29 @@ class CommentAdapter(
     ) {
         val post = postEntity ?: return
 
-        val containsMoreComments = comment.more.size > LOAD_MORE_LIMIT
-
-        val children = comment.more.take(LOAD_MORE_LIMIT).joinToString(",")
-        if (containsMoreComments) {
-            // Remove first 100 comments from list
-            with(comment) {
-                more.subList(0, LOAD_MORE_LIMIT).clear()
-                count = if (count > LOAD_MORE_LIMIT) count - LOAD_MORE_LIMIT else 0
-            }
-        }
-
-        repository.getMoreChildren(children, post.id)
+        repository.getMoreChildren(
+            comment.cursor.orEmpty(),
+            post.id,
+            comment.sortType ?: DEFAULT_COMMENT_SORT
+        )
             .map {
                 commentMapper.dataToEntities(it.json.data.things, null)
             }
             .map {
-                it.filter { comment -> comment.depth < COMMENT_DEPTH_LIMIT }
+                it.filter { loadedComment -> loadedComment.depth < COMMENT_DEPTH_LIMIT }
             }
             .map {
-                restoreCommentHierarchy(it, comment.depth)
+                CommentHierarchy.restore(it, comment.depth)
             }
             .map { comments ->
                 comment.apply { isLoading = false; isError = false }
 
-                comments.forEach { comment ->
-                    (comment as? CommentEntity)?.run {
+                comments.forEach { loadedComment ->
+                    (loadedComment as? CommentEntity)?.run {
                         linkTitle = linkTitle ?: post.title
                         linkPermalink = linkPermalink ?: post.permalink
                         linkAuthor = linkAuthor ?: post.author
-                        saved = savedIds.contains(comment.name)
+                        saved = savedIds.contains(loadedComment.name)
                     }
                 }
 
@@ -193,11 +186,13 @@ class CommentAdapter(
                         parentComment is CommentEntity &&
                         parentComment.isExpanded
                     ) {
-                        parentComment.replies.removeLastOrNull()
-                        parentComment.replies.addAll(comments)
-                        if (containsMoreComments) {
-                            parentComment.replies.add(comment)
+                        val clickedReplyIndex = parentComment.replies.indexOfFirst { it === comment }
+
+                        if (clickedReplyIndex >= 0) {
+                            parentComment.replies.removeAt(clickedReplyIndex)
                         }
+
+                        parentComment.replies.addAll(comments)
                     } else {
                         return@map newList
                     }
@@ -205,10 +200,6 @@ class CommentAdapter(
 
                 newList.removeAt(position)
                 newList.addAll(position, comments)
-
-                if (containsMoreComments) {
-                    newList.add(position + comments.size, comment)
-                }
 
                 return@map newList
             }
@@ -271,36 +262,6 @@ class CommentAdapter(
         }
 
         return@withContext count
-    }
-
-    private suspend fun restoreCommentHierarchy(
-        comments: List<Comment>,
-        depth: Int
-    ): List<Comment> = withContext(defaultDispatcher) {
-        val restored = mutableListOf<Comment>()
-
-        for (i in comments.indices) {
-            val comment = comments[i]
-
-            if (comment.depth > depth) {
-                continue
-            } else if (comment.depth < depth) {
-                break
-            }
-
-            val nextComment = comments.getOrNull(i + 1)
-
-            if (comment is CommentEntity && nextComment != null && nextComment.depth > depth) {
-                comment.replies.addAll(
-                    restoreCommentHierarchy(comments.subList(i + 1, comments.lastIndex), depth + 1)
-                )
-                comment.visibleReplyCount = comment.replies.size
-            }
-
-            restored.add(comment)
-        }
-
-        return@withContext restored
     }
 
     fun cleanUp() {
@@ -426,8 +387,9 @@ class CommentAdapter(
     }
 
     companion object {
-        const val LOAD_MORE_LIMIT = 100
         const val COMMENT_DEPTH_LIMIT = 10
+
+        private const val DEFAULT_COMMENT_SORT = "CONFIDENCE"
 
         private val COMMENT_COMPARATOR = object : DiffUtil.ItemCallback<Comment>() {
             override fun areItemsTheSame(oldItem: Comment, newItem: Comment): Boolean {

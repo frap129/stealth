@@ -144,7 +144,11 @@ sealed class Comment {
 
         override val name: String,
 
-        override val depth: Int
+        override val depth: Int,
+
+        val cursor: String? = null,
+
+        val sortType: String? = null
     ) : Comment() {
         var isLoading: Boolean = false
 

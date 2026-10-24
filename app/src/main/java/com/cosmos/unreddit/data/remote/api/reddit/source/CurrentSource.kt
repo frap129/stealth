@@ -56,9 +56,13 @@ class CurrentSource @Inject constructor(
         return source.getPost(permalink, limit, sort)
     }
 
-    override suspend fun getMoreChildren(children: String, linkId: String): MoreChildren {
+    override suspend fun getMoreChildren(
+        cursor: String,
+        linkId: String,
+        sortType: String
+    ): MoreChildren {
         // TODO: Replace by source when an endpoint is available for Teddit
-        return redditSource.getMoreChildren(children, linkId)
+        return redditSource.getMoreChildren(cursor, linkId, sortType)
     }
 
     override suspend fun getUserInfo(user: String): Child {
