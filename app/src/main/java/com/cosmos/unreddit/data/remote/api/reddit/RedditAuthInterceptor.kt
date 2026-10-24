@@ -2,6 +2,7 @@ package com.cosmos.unreddit.data.remote.api.reddit
 
 import com.cosmos.unreddit.data.remote.api.reddit.auth.AuthSession
 import com.cosmos.unreddit.data.remote.api.reddit.auth.RedditTokenManager
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.RedditGraphQlHeadersInterceptor
 import com.cosmos.unreddit.di.CoroutinesScopesModule.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -84,6 +85,12 @@ class RedditAuthInterceptor
         }
 
         companion object {
-            private val REDDIT_HOSTS = setOf("reddit.com", "www.reddit.com", "oauth.reddit.com")
+            internal val REDDIT_HOSTS =
+                setOf(
+                    "reddit.com",
+                    "www.reddit.com",
+                    "oauth.reddit.com",
+                    RedditGraphQlHeadersInterceptor.GRAPHQL_HOST,
+                )
         }
     }

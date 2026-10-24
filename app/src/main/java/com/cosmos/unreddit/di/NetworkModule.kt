@@ -1,5 +1,6 @@
 package com.cosmos.unreddit.di
 
+import android.content.Context
 import com.cosmos.unreddit.data.remote.RawJsonInterceptor
 import com.cosmos.unreddit.data.remote.RedditCommentsPathInterceptor
 import com.cosmos.unreddit.data.remote.TargetRedditInterceptor
@@ -17,6 +18,9 @@ import com.cosmos.unreddit.data.remote.api.reddit.adapter.MediaMetadataAdapter
 import com.cosmos.unreddit.data.remote.api.reddit.adapter.NullToEmptyStringAdapter
 import com.cosmos.unreddit.data.remote.api.reddit.adapter.RepliesAdapter
 import com.cosmos.unreddit.data.remote.api.reddit.auth.RedditTlsFactory
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.GraphQlExecutor
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.RedditGraphQlClient
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.RedditGraphQlHeadersInterceptor
 import com.cosmos.unreddit.data.remote.api.reddit.model.AboutChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.AboutUserChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.Child
@@ -27,13 +31,16 @@ import com.cosmos.unreddit.data.remote.api.reddit.model.PostChild
 import com.cosmos.unreddit.data.remote.api.redgifs.RedgifsApi
 import com.cosmos.unreddit.data.remote.api.streamable.StreamableApi
 import com.cosmos.unreddit.data.repository.PreferencesRepository
+import com.cosmos.unreddit.di.DispatchersModule.IoDispatcher
 import com.cosmos.unreddit.util.LinkValidator
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapters.PolymorphicJsonAdapterFactory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -89,6 +96,10 @@ object NetworkModule {
     @Qualifier
     @Retention(AnnotationRetention.BINARY)
     annotation class AuthRedditOkHttp
+
+    @Qualifier
+    @Retention(AnnotationRetention.BINARY)
+    annotation class RedditGqlOkHttp
 
     @RedditMoshi
     @Provides
@@ -155,6 +166,43 @@ object NetworkModule {
             .readTimeout(TIMEOUT.first, TIMEOUT.second)
             .writeTimeout(TIMEOUT.first, TIMEOUT.second)
             .build()
+
+    @RedditGqlOkHttp
+    @Provides
+    @Singleton
+    fun provideRedditGqlOkHttpClient(
+        redditAuthInterceptor: RedditAuthInterceptor,
+        graphQlHeadersInterceptor: RedditGraphQlHeadersInterceptor,
+    ): OkHttpClient =
+        OkHttpClient
+            .Builder()
+            .sslSocketFactory(RedditTlsFactory.socketFactory(), RedditTlsFactory.trustManager())
+            .protocols(listOf(Protocol.HTTP_1_1))
+            .addInterceptor(redditAuthInterceptor)
+            .addInterceptor(graphQlHeadersInterceptor)
+            .connectTimeout(TIMEOUT.first, TIMEOUT.second)
+            .readTimeout(TIMEOUT.first, TIMEOUT.second)
+            .writeTimeout(TIMEOUT.first, TIMEOUT.second)
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideRedditGraphQlClient(
+        @RedditGqlOkHttp okHttpClient: OkHttpClient,
+        @RedditMoshi moshi: Moshi,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
+    ): RedditGraphQlClient = RedditGraphQlClient(okHttpClient, moshi, ioDispatcher)
+
+    @Provides
+    @Singleton
+    fun provideGraphQlExecutor(client: RedditGraphQlClient): GraphQlExecutor = client
+
+    @Provides
+    @Singleton
+    fun provideGraphQlHeadersInterceptor(
+        @ApplicationContext context: Context,
+    ): RedditGraphQlHeadersInterceptor =
+        RedditGraphQlHeadersInterceptor(context, RedditGraphQlHeadersInterceptor.GRAPHQL_HOST)
 
     @TedditOkHttp
     @Provides
