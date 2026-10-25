@@ -15,7 +15,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.model.AboutUserChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.Child
 import com.cosmos.unreddit.data.remote.api.reddit.model.Listing
 import com.cosmos.unreddit.data.remote.api.reddit.model.MoreChildren
-import com.cosmos.unreddit.data.remote.api.reddit.source.CurrentSource
+import com.cosmos.unreddit.data.remote.api.reddit.source.BaseRedditSource
 import com.cosmos.unreddit.data.remote.datasource.CommentsDataSource
 import com.cosmos.unreddit.data.remote.datasource.SearchPostDataSource
 import com.cosmos.unreddit.data.remote.datasource.SearchSubredditDataSource
@@ -34,7 +34,7 @@ import javax.inject.Singleton
 
 @Singleton
 class PostListRepository @Inject constructor(
-    private val source: CurrentSource,
+    private val source: BaseRedditSource,
     private val redditDatabase: RedditDatabase,
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
     @MainImmediateDispatcher private val mainImmediateDispatcher: CoroutineDispatcher

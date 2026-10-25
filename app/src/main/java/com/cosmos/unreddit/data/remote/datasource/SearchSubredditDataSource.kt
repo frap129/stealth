@@ -5,10 +5,10 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.cosmos.unreddit.data.model.Sorting
 import com.cosmos.unreddit.data.remote.api.reddit.model.Child
-import com.cosmos.unreddit.data.remote.api.reddit.source.CurrentSource
+import com.cosmos.unreddit.data.remote.api.reddit.source.BaseRedditSource
 
 class SearchSubredditDataSource(
-    private val source: CurrentSource,
+    private val source: BaseRedditSource,
     private val query: String,
     private val sorting: Sorting
 ) : PagingSource<String, Child>() {

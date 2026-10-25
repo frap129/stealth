@@ -33,12 +33,17 @@ class RedditGraphQlClient(
                 if (!response.isSuccessful) {
                     throw GraphQlException(response.code, responseBody)
                 }
+                val remaining = response.header("x-ratelimit-remaining")?.toFloatOrNull()
+                if (remaining != null && remaining <= RATE_LIMIT_FLOOR) {
+                    throw RateLimitException("GraphQL rate limit near exhaustion")
+                }
                 responseBody
             }
         }
 
     companion object {
         const val ENDPOINT = "https://gql-fed.reddit.com/"
+        private const val RATE_LIMIT_FLOOR = 4f
         private val JSON = "application/json".toMediaType()
     }
 }
