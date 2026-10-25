@@ -76,6 +76,26 @@ class GraphQlModelsTest {
     }
 
     @Test
+    fun `parses packaged video playback and streaming metadata`() {
+        val inputJson =
+            """{"data":{"postsInfoByIds":[{"__typename":"SubredditPost","id":"t3_video","media":{"streaming":{"scrubberMediaUrl":"https://v.redd.it/x/CMAF_96.mp4","isGif":true},"packagedMedia":{"playbackMp4s":{"permutations":[{"source":{"url":"https://v.redd.it/x/CMAF_128.mp4"},"bitrateBps":128000}]}}}}]}}"""
+        val actualResponse =
+            Moshi.Builder().build().adapter(PostsByIdsResponse::class.java).fromJson(inputJson)!!
+        val actualMedia = requireNotNull(
+            requireNotNull(actualResponse.data?.postsInfoByIds).single()?.media,
+        )
+        assertEquals(
+            "https://v.redd.it/x/CMAF_96.mp4",
+            actualMedia.streaming!!.scrubberMediaUrl,
+        )
+        assertTrue(actualMedia.streaming!!.isGif)
+        val actualPermutation =
+            requireNotNull(actualMedia.packagedMedia!!.playbackMp4s).permutations.single()
+        assertEquals("https://v.redd.it/x/CMAF_128.mp4", actualPermutation.source!!.url)
+        assertEquals(128000, actualPermutation.bitrateBps)
+    }
+
+    @Test
     fun `parses deleted and null posts by ids elements`() {
         val inputJson =
             """{"data":{"postsInfoByIds":[null,{"__typename":"DeletedSubredditPost","id":"t3_deleted"}]}}"""

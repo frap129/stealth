@@ -5,6 +5,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlGalleryIt
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlGalleryMedia
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlMedia
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlMediaSource
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlPlaybackPermutation
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlPostNode
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlStreaming
 import com.cosmos.unreddit.data.remote.api.reddit.model.GalleryData
@@ -18,11 +19,13 @@ import com.cosmos.unreddit.data.remote.api.reddit.model.MediaMetadata
 import com.cosmos.unreddit.data.remote.api.reddit.model.MediaPreview
 import com.cosmos.unreddit.data.remote.api.reddit.model.PostData
 import com.cosmos.unreddit.data.remote.api.reddit.model.RedditVideoPreview
+import java.util.Locale
 import javax.inject.Inject
 
 class GraphQlPostMapper @Inject constructor() {
-    fun toPostData(node: GraphQlPostNode): PostData =
-        PostData(
+    fun toPostData(node: GraphQlPostNode): PostData {
+        val media: Media? = node.media?.toMedia()
+        return PostData(
             subreddit = node.subreddit?.name.orEmpty(),
             linkFlairRichText = emptyList(),
             authorFlairRichText = null,
@@ -41,25 +44,26 @@ class GraphQlPostMapper @Inject constructor() {
             crossposts = null,
             domain = node.domain.orEmpty(),
             selfTextHtml = node.content?.html,
-            suggestedSort = node.suggestedCommentSort,
+            suggestedSort = node.suggestedCommentSort?.lowercase(Locale.US),
             isArchived = node.isArchived,
             isOver18 = node.isNsfw,
             mediaPreview = node.media?.toPreview(),
             awardings = emptyList(),
             isSpoiler = node.isSpoiler,
             isLocked = node.isLocked,
-            distinguished = node.distinguishedAs,
+            distinguished = node.distinguishedAs?.lowercase(Locale.US),
             author = node.authorInfo?.name.orEmpty(),
             commentsNumber = node.commentCount,
             permalink = node.permalink.orEmpty(),
             isStickied = node.isStickied,
             url = node.url.orEmpty(),
             created = GraphQlTimestamp.toEpochSeconds(node.createdAt.orEmpty()),
-            media = node.media?.toMedia(),
+            media = media,
             mediaMetadata = node.gallery?.toMediaMetadata(),
             isRedditGallery = node.gallery != null,
-            isVideo = node.media?.streaming != null || node.media?.video != null,
+            isVideo = media != null,
         )
+    }
 
     private fun GraphQlMedia.toPreview(): MediaPreview? {
         val source: GraphQlMediaSource = still?.source ?: return null
@@ -77,22 +81,30 @@ class GraphQlPostMapper @Inject constructor() {
     }
 
     private fun GraphQlMedia.toMedia(): Media? {
-        val video: GraphQlStreaming = streaming ?: video ?: return null
-        val fallbackUrl: String = video.dashUrl?.takeIf { it.isNotBlank() }
-            ?: video.hlsUrl?.takeIf { it.isNotBlank() }
-            ?: return null
+        val streaming: GraphQlStreaming? = streaming
+        val packagedUrl: String? =
+            packagedMedia?.playbackMp4s?.permutations
+                ?.mapNotNull { permutation: GraphQlPlaybackPermutation -> permutation.source?.url }
+                ?.firstOrNull { url: String -> url.isProgressiveRedditMp4() }
+        val fallbackUrl: String =
+            packagedUrl
+                ?: streaming?.scrubberMediaUrl?.takeIf { url: String -> url.isProgressiveRedditMp4() }
+                ?: return null
         return Media(
             type = "video",
             embed = null,
             redditVideoPreview = RedditVideoPreview(
                 fallbackUrl = fallbackUrl,
-                width = video.resolvedWidth,
-                height = video.resolvedHeight,
-                duration = video.duration,
-                isGif = false,
+                width = streaming?.resolvedWidth ?: 0,
+                height = streaming?.resolvedHeight ?: 0,
+                duration = streaming?.duration ?: 0,
+                isGif = streaming?.isGif ?: false,
             ),
         )
     }
+
+    private fun String.isProgressiveRedditMp4(): Boolean =
+        isNotBlank() && REDDIT_VIDEO_MP4_REGEX.containsMatchIn(this)
 
     private fun GraphQlGallery.toGalleryData(): GalleryData =
         GalleryData(
@@ -160,4 +172,8 @@ class GraphQlPostMapper @Inject constructor() {
         val width: Int,
         val height: Int,
     )
+
+    private companion object {
+        private val REDDIT_VIDEO_MP4_REGEX: Regex = Regex("(DASH|CMAF)_\\d+")
+    }
 }

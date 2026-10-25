@@ -51,6 +51,7 @@ data class GraphQlMedia(
     val still: GraphQlStill? = null,
     val streaming: GraphQlStreaming? = null,
     val video: GraphQlStreaming? = null,
+    val packagedMedia: GraphQlPackagedMedia? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -71,11 +72,27 @@ data class GraphQlMediaSource(
 data class GraphQlStreaming(
     val dashUrl: String? = null,
     val hlsUrl: String? = null,
+    val scrubberMediaUrl: String? = null,
+    val isGif: Boolean = false,
     val duration: Int = 0,
     val width: Int = 0,
     val height: Int = 0,
     val hasAudio: Boolean = false,
     val dimensions: GraphQlDimensions? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class GraphQlPackagedMedia(val playbackMp4s: GraphQlPlaybackMp4s? = null)
+
+@JsonClass(generateAdapter = true)
+data class GraphQlPlaybackMp4s(
+    val permutations: List<GraphQlPlaybackPermutation> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class GraphQlPlaybackPermutation(
+    val source: GraphQlMediaSource? = null,
+    val bitrateBps: Int = 0,
 )
 
 @JsonClass(generateAdapter = true)
