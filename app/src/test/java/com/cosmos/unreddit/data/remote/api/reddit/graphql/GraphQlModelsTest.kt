@@ -2,6 +2,9 @@ package com.cosmos.unreddit.data.remote.api.reddit.graphql
 
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommunitySearchResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.LiveCommentsByIdsResponse
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFeedElements
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFeedRoot
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PopularFeedResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PostCommentsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PostsByIdsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SearchPeopleResponse
@@ -119,6 +122,20 @@ class GraphQlModelsTest {
         assertTrue(actualElements.pageInfo.hasNextPage)
         assertEquals(2, actualElements.edges.size)
         assertEquals("t3_abc", actualElements.edges.first().node!!.groupId)
+        assertNull(actualElements.edges.last().node)
+    }
+
+    @Test
+    fun `parses a popular feed response`() {
+        val inputJson: String =
+            """{"data":{"popularV3":{"elements":{"pageInfo":{"endCursor":"t3_pop"},"edges":[{"node":{"groupId":"t3_pop"}},{"node":null}]}}}}"""
+        val actualResponse: PopularFeedResponse =
+            Moshi.Builder().build().adapter(PopularFeedResponse::class.java).fromJson(inputJson)!!
+        val actualFeed: GraphQlFeedRoot = requireNotNull(actualResponse.data?.popularV3)
+        val actualElements: GraphQlFeedElements = requireNotNull(actualFeed.elements)
+        assertEquals("t3_pop", actualElements.pageInfo.endCursor)
+        assertEquals(2, actualElements.edges.size)
+        assertEquals("t3_pop", actualElements.edges.first().node!!.groupId)
         assertNull(actualElements.edges.last().node)
     }
 
