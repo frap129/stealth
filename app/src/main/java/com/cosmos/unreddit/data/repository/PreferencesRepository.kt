@@ -94,34 +94,6 @@ class PreferencesRepository @Inject constructor(
         )
     }
 
-    suspend fun setRedditSource(redditSource: Int) {
-        preferencesDatastore.setValue(
-            DataPreferences.PreferencesKeys.REDDIT_SOURCE,
-            redditSource
-        )
-    }
-
-    fun getRedditSource(defaultValue: Int = DataPreferences.RedditSource.REDDIT.value): Flow<Int> {
-        return preferencesDatastore.getValue(
-            DataPreferences.PreferencesKeys.REDDIT_SOURCE,
-            defaultValue
-        )
-    }
-
-    suspend fun setRedditSourceInstance(instance: String) {
-        preferencesDatastore.setValue(
-            DataPreferences.PreferencesKeys.REDDIT_SOURCE_INSTANCE,
-            instance
-        )
-    }
-
-    fun getRedditSourceInstance(defaultValue: String = ""): Flow<String> {
-        return preferencesDatastore.getValue(
-            DataPreferences.PreferencesKeys.REDDIT_SOURCE_INSTANCE,
-            defaultValue
-        )
-    }
-
     suspend fun setPrivacyEnhancerEnabled(enablePrivacyEnhancer: Boolean) {
         preferencesDatastore.setValue(
             DataPreferences.PreferencesKeys.PRIVACY_ENHANCER,

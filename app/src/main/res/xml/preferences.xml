@@ -44,11 +44,6 @@
         app:title="@string/preference_category_data">
 
         <Preference
-            app:key="reddit_source"
-            app:title="@string/preference_reddit_source"
-            app:persistent="false"/>
-
-        <Preference
             app:key="privacy_enhancer"
             app:title="@string/preference_privacy_enhancer"
             app:persistent="false"/>
