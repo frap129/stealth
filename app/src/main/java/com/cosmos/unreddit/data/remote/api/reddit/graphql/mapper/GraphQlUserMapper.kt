@@ -9,22 +9,27 @@ import com.cosmos.unreddit.data.remote.api.reddit.model.Subreddit
 import javax.inject.Inject
 
 class GraphQlUserMapper @Inject constructor() {
-    fun toAboutUserData(user: GraphQlUserProfile): AboutUserData {
+    fun toAboutUserData(
+        user: GraphQlUserProfile,
+        isSuspended: Boolean = false,
+    ): AboutUserData {
         val profileInfo: GraphQlProfileInfo? = user.profileInfo
         val iconUrl: String? = user.icon?.url?.takeIf { it.isNotBlank() }
+        val name: String = user.name.orEmpty()
+        val prefixedName: String = user.prefixedName.orEmpty()
         return buildAboutUserData(
-            id = user.id,
-            name = user.name,
-            prefixedName = user.prefixedName,
+            id = user.id.orEmpty(),
+            name = name,
             iconImg = iconUrl,
+            isSuspended = isSuspended,
             isEmployee = user.isEmployee,
             totalKarma = user.karma?.total ?: UNKNOWN_KARMA,
             createdAt = parseCreatedAt(profileInfo?.createdAt),
             snoovatarImg = user.snoovatarIcon?.url,
             subreddit = profileInfo?.let {
                 buildSubreddit(
-                    name = user.name,
-                    prefixedName = user.prefixedName,
+                    name = name,
+                    prefixedName = prefixedName,
                     iconImg = iconUrl,
                     title = it.title.orEmpty(),
                     over18 = it.isNsfw,
@@ -41,8 +46,8 @@ class GraphQlUserMapper @Inject constructor() {
         return buildAboutUserData(
             id = user.id,
             name = user.name,
-            prefixedName = user.prefixedName,
             iconImg = iconUrl,
+            isSuspended = false,
             isEmployee = false,
             totalKarma = user.karma?.total ?: UNKNOWN_KARMA,
             createdAt = parseCreatedAt(profile?.createdAt),
@@ -63,8 +68,8 @@ class GraphQlUserMapper @Inject constructor() {
     private fun buildAboutUserData(
         id: String,
         name: String,
-        prefixedName: String,
         iconImg: String?,
+        isSuspended: Boolean,
         isEmployee: Boolean,
         totalKarma: Int,
         createdAt: Long,
@@ -72,7 +77,7 @@ class GraphQlUserMapper @Inject constructor() {
         subreddit: Subreddit?,
     ): AboutUserData =
         AboutUserData(
-            isSuspended = false,
+            isSuspended = isSuspended,
             isEmployee = isEmployee,
             subreddit = subreddit,
             id = id,

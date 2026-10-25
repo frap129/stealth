@@ -17,9 +17,9 @@ class GraphQlSubredditMapper @Inject constructor() {
             ?: styles?.legacyIcon?.url?.takeIf { it.isNotBlank() }
         return AboutData(
             wikiEnabled = info.wiki?.indexPage?.status != null,
-            displayName = info.name,
+            displayName = info.name.orEmpty(),
             headerImg = bannerImage,
-            title = info.title,
+            title = info.title.orEmpty(),
             primaryColor = styles?.primaryColor,
             // GraphQL exposes weekly active users, not the current online count shown by the UI.
             activeUserCount = null,
@@ -33,8 +33,8 @@ class GraphQlSubredditMapper @Inject constructor() {
             bannerBackgroundColor = null,
             over18 = info.isNsfw,
             descriptionHtml = info.description.toDescriptionHtml(),
-            url = "https://www.reddit.com${info.path}",
-            created = GraphQlTimestamp.toEpochSeconds(info.createdAt),
+            url = "https://www.reddit.com${info.path.orEmpty()}",
+            created = GraphQlTimestamp.toEpochSeconds(info.createdAt.orEmpty()),
         )
     }
 

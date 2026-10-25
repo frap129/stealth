@@ -4,6 +4,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommentForest
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommentTree
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlComment
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlMore
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlSubmittedComment
 import com.cosmos.unreddit.data.remote.api.reddit.model.Child
 import com.cosmos.unreddit.data.remote.api.reddit.model.CommentChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.CommentData
@@ -26,10 +27,21 @@ class GraphQlCommentMapper @Inject constructor() {
     ): List<Child> {
         val context: CommentMappingContext =
             CommentMappingContext(postId, postTitle, postPermalink, subreddit, forest.appliedSort)
-        val treesByParent: Map<String?, List<CommentTree>> = forest.trees.groupBy { it.parentId }
-        return treesByParent[null].orEmpty().mapNotNull { tree: CommentTree ->
-            tree.toChild(treesByParent, context)
-        }
+        return buildChildren(forest.trees, 0, -1, -1, null, context).first
+    }
+
+    fun toCommentChild(
+        comment: GraphQlComment,
+        postId: String,
+        postTitle: String,
+        postPermalink: String,
+        subreddit: String,
+    ): CommentChild? {
+        if (!isRenderable(comment)) return null
+        val commentId: String = requireNotNull(comment.id)
+        val context: CommentMappingContext =
+            CommentMappingContext(postId, postTitle, postPermalink, subreddit, null)
+        return CommentChild(toCommentData(comment, commentId, null, 0, context))
     }
 
     fun toMoreChildren(
@@ -41,41 +53,103 @@ class GraphQlCommentMapper @Inject constructor() {
     ): MoreChildren {
         val context: CommentMappingContext =
             CommentMappingContext(postId, postTitle, postPermalink, subreddit, forest.appliedSort)
-        val children: List<Child> = forest.trees.mapNotNull { tree: CommentTree ->
-            tree.toFlatChild(context)
+        val deletedDepths: MutableList<Int> = mutableListOf()
+        val visibleCommentIdsByDepth: MutableMap<Int, String> = mutableMapOf()
+        val children: MutableList<Child> = mutableListOf()
+        for (tree: CommentTree in forest.trees) {
+            while (deletedDepths.isNotEmpty() && deletedDepths.last() >= tree.depth) {
+                deletedDepths.removeAt(deletedDepths.lastIndex)
+            }
+            val effectiveDepth: Int = tree.depth - deletedDepths.size
+            visibleCommentIdsByDepth.keys
+                .filter { depth: Int -> depth >= effectiveDepth }
+                .forEach { depth: Int -> visibleCommentIdsByDepth.remove(depth) }
+            val comment: GraphQlComment? = tree.node
+            if (comment != null && isRenderable(comment)) {
+                val commentId: String = requireNotNull(comment.id)
+                visibleCommentIdsByDepth[effectiveDepth] = commentId
+                children +=
+                    CommentChild(toCommentData(comment, commentId, null, effectiveDepth, context))
+            } else if (tree.more != null) {
+                val parentCommentId: String? =
+                    visibleCommentIdsByDepth
+                        .filterKeys { depth: Int -> depth < effectiveDepth }
+                        .maxByOrNull { entry: Map.Entry<Int, String> -> entry.key }
+                        ?.value
+                        ?: tree.parentId.takeIf { effectiveDepth > 0 }
+                children += MoreChild(tree.toMoreData(parentCommentId, effectiveDepth, context))
+            } else {
+                deletedDepths.add(tree.depth)
+            }
         }
         return MoreChildren(JsonMore(Data(children)))
     }
 
-    private fun CommentTree.toChild(
-        treesByParent: Map<String?, List<CommentTree>>,
+    private fun buildChildren(
+        trees: List<CommentTree>,
+        startIndex: Int,
+        parentDepth: Int,
+        renderDepth: Int,
+        parentCommentId: String?,
         context: CommentMappingContext,
-    ): Child? {
-        node?.let { comment: GraphQlComment ->
-            val children: List<Child> = treesByParent[comment.id].orEmpty().mapNotNull { child: CommentTree ->
-                child.toChild(treesByParent, context)
+    ): Pair<List<Child>, Int> {
+        val children: MutableList<Child> = mutableListOf()
+        var index: Int = startIndex
+        while (index < trees.size && trees[index].depth > parentDepth) {
+            val tree: CommentTree = trees[index]
+            val comment: GraphQlComment? = tree.node
+            when {
+                comment != null && isRenderable(comment) -> {
+                    val commentId: String = requireNotNull(comment.id)
+                    val effectiveDepth: Int = renderDepth + 1
+                    val (replies, next) =
+                        buildChildren(
+                            trees,
+                            index + 1,
+                            tree.depth,
+                            effectiveDepth,
+                            commentId,
+                            context,
+                        )
+                    children += CommentChild(
+                        toCommentData(
+                            comment,
+                            commentId,
+                            replies.toListing(),
+                            effectiveDepth,
+                            context,
+                        ),
+                    )
+                    index = next
+                }
+                tree.more != null -> {
+                    children +=
+                        MoreChild(tree.toMoreData(parentCommentId, renderDepth + 1, context))
+                    index++
+                }
+                else -> {
+                    val (promoted, next) =
+                        buildChildren(
+                            trees,
+                            index + 1,
+                            tree.depth,
+                            renderDepth,
+                            parentCommentId,
+                            context,
+                        )
+                    children += promoted
+                    index = next
+                }
             }
-            return CommentChild(toCommentData(comment, children.toListing(), context))
         }
-        more?.let {
-            return MoreChild(toMoreData(context))
-        }
-        return null
+        return children to index
     }
 
-    private fun CommentTree.toFlatChild(context: CommentMappingContext): Child? {
-        node?.let { comment: GraphQlComment ->
-            return CommentChild(toCommentData(comment, null, context))
-        }
-        more?.let {
-            return MoreChild(toMoreData(context))
-        }
-        return null
-    }
-
-    private fun CommentTree.toCommentData(
+    private fun toCommentData(
         comment: GraphQlComment,
+        commentId: String,
         replies: Listing?,
+        depth: Int,
         context: CommentMappingContext,
     ): CommentData = CommentData(
         totalAwards = comment.awardings.sumOf { it.total },
@@ -91,9 +165,9 @@ class GraphQlCommentMapper @Inject constructor() {
         stickied = comment.isStickied,
         scoreHidden = comment.isScoreHidden,
         permalink = comment.permalink.orEmpty(),
-        id = comment.id,
-        name = comment.id,
-        created = GraphQlTimestamp.toEpochSeconds(comment.createdAt),
+        id = commentId,
+        name = commentId,
+        created = GraphQlTimestamp.toEpochSeconds(comment.createdAt.orEmpty()),
         controversiality = 0,
         flair = comment.authorFlair?.text,
         depth = depth,
@@ -104,14 +178,18 @@ class GraphQlCommentMapper @Inject constructor() {
         linkAuthor = null,
     )
 
-    private fun CommentTree.toMoreData(context: CommentMappingContext): MoreData {
+    private fun CommentTree.toMoreData(
+        parentCommentId: String?,
+        effectiveDepth: Int,
+        context: CommentMappingContext,
+    ): MoreData {
         val more: GraphQlMore = requireNotNull(more)
         return MoreData(
             count = more.count,
             name = parentId ?: MORE_NAME,
             id = more.cursor,
-            depth = depth,
-            parentId = parentId.orEmpty(),
+            depth = effectiveDepth,
+            parentId = parentCommentId.orEmpty(),
             children = mutableListOf(),
             cursor = more.cursor,
             sortType = context.appliedSort,
@@ -133,9 +211,16 @@ class GraphQlCommentMapper @Inject constructor() {
         val appliedSort: String?,
     )
 
-    private companion object {
+    companion object {
+        internal fun isRenderable(comment: GraphQlComment): Boolean =
+            comment.typename != DELETED_COMMENT_TYPENAME && comment.id != null
+
+        internal fun isRenderable(comment: GraphQlSubmittedComment): Boolean =
+            comment.typename != DELETED_COMMENT_TYPENAME && comment.id != null
+
         private const val LISTING_KIND: String = "Listing"
         private const val MORE_NAME: String = "more"
         private const val NOT_EDITED: Long = -1L
+        private const val DELETED_COMMENT_TYPENAME: String = "DeletedComment"
     }
 }

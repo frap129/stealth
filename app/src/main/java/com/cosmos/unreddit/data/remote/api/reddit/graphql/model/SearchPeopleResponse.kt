@@ -10,7 +10,7 @@ data class SearchPeopleResponse(
 )
 
 @JsonClass(generateAdapter = true)
-data class SearchPeopleData(val search: GraphQlSearch)
+data class SearchPeopleData(val search: GraphQlSearch? = null)
 
 @JsonClass(generateAdapter = true)
 data class GraphQlPersonSearch(

@@ -9,10 +9,10 @@ data class SubredditFeedResponse(
 )
 
 @JsonClass(generateAdapter = true)
-data class SubredditFeedData(val subredditV3: GraphQlFeedRoot)
+data class SubredditFeedData(val subredditV3: GraphQlFeedRoot? = null)
 
 @JsonClass(generateAdapter = true)
-data class GraphQlFeedRoot(val elements: GraphQlFeedElements)
+data class GraphQlFeedRoot(val elements: GraphQlFeedElements? = null)
 
 @JsonClass(generateAdapter = true)
 data class GraphQlFeedElements(

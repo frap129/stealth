@@ -1,5 +1,6 @@
 package com.cosmos.unreddit.data.remote.api.reddit.graphql.model
 
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
@@ -9,7 +10,7 @@ data class PostCommentsResponse(
 )
 
 @JsonClass(generateAdapter = true)
-data class PostCommentsData(val postInfoById: PostInfoById)
+data class PostCommentsData(val postInfoById: PostInfoById? = null)
 
 @JsonClass(generateAdapter = true)
 data class PostInfoById(
@@ -55,8 +56,9 @@ data class GraphQlMore(
 
 @JsonClass(generateAdapter = true)
 data class GraphQlComment(
-    val id: String,
-    val createdAt: String,
+    @Json(name = "__typename") val typename: String? = null,
+    val id: String? = null,
+    val createdAt: String? = null,
     val editedAt: String? = null,
     val isRemoved: Boolean = false,
     val isLocked: Boolean = false,

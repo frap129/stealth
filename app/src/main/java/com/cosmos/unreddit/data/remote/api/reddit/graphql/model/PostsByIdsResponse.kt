@@ -1,5 +1,6 @@
 package com.cosmos.unreddit.data.remote.api.reddit.graphql.model
 
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
@@ -9,16 +10,17 @@ data class PostsByIdsResponse(
 )
 
 @JsonClass(generateAdapter = true)
-data class PostsByIdsData(val postsInfoByIds: List<GraphQlPostNode>)
+data class PostsByIdsData(val postsInfoByIds: List<GraphQlPostNode?>? = null)
 
 @JsonClass(generateAdapter = true)
 data class GraphQlPostNode(
-    val id: String,
-    val postTitle: String,
-    val permalink: String,
-    val url: String,
+    @Json(name = "__typename") val typename: String? = null,
+    val id: String? = null,
+    val postTitle: String? = null,
+    val permalink: String? = null,
+    val url: String? = null,
     val domain: String? = null,
-    val createdAt: String,
+    val createdAt: String? = null,
     val editedAt: String? = null,
     val score: Int = 0,
     val upvoteRatio: Double? = null,
@@ -55,7 +57,15 @@ data class GraphQlMedia(
 data class GraphQlStill(val source: GraphQlMediaSource? = null)
 
 @JsonClass(generateAdapter = true)
-data class GraphQlMediaSource(val url: String, val width: Int = 0, val height: Int = 0)
+data class GraphQlDimensions(val width: Int = 0, val height: Int = 0)
+
+@JsonClass(generateAdapter = true)
+data class GraphQlMediaSource(
+    val url: String,
+    val width: Int = 0,
+    val height: Int = 0,
+    val dimensions: GraphQlDimensions? = null,
+)
 
 @JsonClass(generateAdapter = true)
 data class GraphQlStreaming(
@@ -65,6 +75,7 @@ data class GraphQlStreaming(
     val width: Int = 0,
     val height: Int = 0,
     val hasAudio: Boolean = false,
+    val dimensions: GraphQlDimensions? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -78,4 +89,15 @@ data class GraphQlGalleryItem(
     val url: String? = null,
     val width: Int = 0,
     val height: Int = 0,
+    val media: GraphQlGalleryMedia? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class GraphQlGalleryMedia(
+    val id: String? = null,
+    val url: String? = null,
+    val width: Int = 0,
+    val height: Int = 0,
+    val still: GraphQlStill? = null,
+    val dimensions: GraphQlDimensions? = null,
 )

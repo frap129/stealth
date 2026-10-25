@@ -9,7 +9,9 @@ data class CommunitySearchResponse(
 )
 
 @JsonClass(generateAdapter = true)
-data class CommunitySearchData(val targetableCommunityInfo: List<GraphQlTargetableCommunity>)
+data class CommunitySearchData(
+    val targetableCommunityInfo: List<GraphQlTargetableCommunity>? = null,
+)
 
 @JsonClass(generateAdapter = true)
 data class GraphQlTargetableCommunity(

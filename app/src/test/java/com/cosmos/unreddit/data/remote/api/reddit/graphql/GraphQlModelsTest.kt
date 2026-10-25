@@ -24,12 +24,12 @@ class GraphQlModelsTest {
             """{"data":{"postInfoById":{"id":"t3_1wzvqsb","title":"t","subreddit":{"prefixedName":"r/Android"},"commentCount":1,"commentForest":{"appliedSort":"CONFIDENCE","pageInfo":{"commentCount":1,"hasNextPage":false},"trees":[{"depth":0,"parentId":null,"childCount":0,"more":null,"node":{"__typename":"Comment","id":"t1_a","createdAt":"2026-10-07T15:47:48.255000+0000","content":{"html":"<p>hi</p>","markdown":"hi","preview":"hi"},"authorInfo":{"name":"a"},"authorFlair":{"text":"Flair"},"score":1,"voteState":"NONE","isOP":false,"isStickied":false,"isScoreHidden":false,"isRemoved":false,"isLocked":false,"awardings":[{"total":2}],"permalink":"/r/Android/comments/1wzvqsb/a/"}}]}}},"extensions":{"traceID":"x"}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(PostCommentsResponse::class.java).fromJson(inputJson)!!
-        val actualData = actualResponse.data!!
-        assertEquals("t3_1wzvqsb", actualData.postInfoById.id)
-        assertEquals("r/Android", actualData.postInfoById.subreddit!!.prefixedName)
-        assertEquals("CONFIDENCE", actualData.postInfoById.commentForest.appliedSort)
-        assertEquals(1, actualData.postInfoById.commentForest.trees.size)
-        val actualTree = actualData.postInfoById.commentForest.trees.first()
+        val actualPostInfo = requireNotNull(actualResponse.data?.postInfoById)
+        assertEquals("t3_1wzvqsb", actualPostInfo.id)
+        assertEquals("r/Android", actualPostInfo.subreddit!!.prefixedName)
+        assertEquals("CONFIDENCE", actualPostInfo.commentForest.appliedSort)
+        assertEquals(1, actualPostInfo.commentForest.trees.size)
+        val actualTree = actualPostInfo.commentForest.trees.first()
         assertEquals(0, actualTree.depth)
         assertNull(actualTree.parentId)
         val actualComment = actualTree.node!!
@@ -40,12 +40,28 @@ class GraphQlModelsTest {
     }
 
     @Test
+    fun `parses a deleted comment node without an id`() {
+        val inputJson =
+            """{"data":{"postInfoById":{"id":"t3_1","title":"t","commentCount":1,"commentForest":{"pageInfo":{"hasNextPage":false},"trees":[{"depth":2,"parentId":"t1_a","childCount":2,"more":null,"node":{"__typename":"DeletedComment","createdAt":"2026-10-23T12:48:55.300000+0000","isInitiallyCollapsed":true,"moderationInfo":null,"removedByCategory":"DELETED"}}]}}}}"""
+        val actualResponse =
+            Moshi.Builder().build().adapter(PostCommentsResponse::class.java).fromJson(inputJson)!!
+        val actualNode =
+            requireNotNull(
+                requireNotNull(actualResponse.data?.postInfoById)
+                    .commentForest.trees.single().node,
+            )
+        assertEquals("DeletedComment", actualNode.typename)
+        assertNull(actualNode.id)
+        assertEquals("2026-10-23T12:48:55.300000+0000", actualNode.createdAt)
+    }
+
+    @Test
     fun `parses a posts by ids response`() {
         val inputJson =
-            """{"data":{"postsInfoByIds":[{"id":"t3_1wzvqsb","postTitle":"A post","permalink":"/r/Android/comments/1wzvqsb/a/","url":"https://example.com","domain":"example.com","createdAt":"2026-10-07T15:47:48.255000+0000","editedAt":null,"score":42,"upvoteRatio":0.95,"commentCount":3,"isSelfPost":false,"isNsfw":false,"isSpoiler":false,"isStickied":false,"isLocked":false,"isArchived":false,"content":{"html":"<p>body</p>","markdown":"body"},"flair":{"text":"Discussion"},"authorFlair":{"text":"Author flair"},"authorInfo":{"name":"author"},"awardings":[{"total":2}],"media":{"still":{"source":{"url":"https://example.com/image.jpg","width":100,"height":50}},"video":{"dashUrl":"https://example.com/dash","hlsUrl":"https://example.com/hls","duration":12,"width":100,"height":50,"hasAudio":true}},"gallery":{"items":[{"id":"item","mediaId":"media","caption":"cap","url":"https://example.com/g.jpg","width":10,"height":20}]},"subreddit":{"name":"Android","prefixedName":"r/Android"}}]}}"""
+            """{"data":{"postsInfoByIds":[{"__typename":"SubredditPost","id":"t3_1wzvqsb","postTitle":"A post","permalink":"/r/Android/comments/1wzvqsb/a/","url":"https://example.com","domain":"example.com","createdAt":"2026-10-07T15:47:48.255000+0000","editedAt":null,"score":42,"upvoteRatio":0.95,"commentCount":3,"isSelfPost":false,"isNsfw":false,"isSpoiler":false,"isStickied":false,"isLocked":false,"isArchived":false,"content":{"html":"<p>body</p>","markdown":"body"},"flair":{"text":"Discussion"},"authorFlair":{"text":"Author flair"},"authorInfo":{"name":"author"},"awardings":[{"total":2}],"media":{"still":{"source":{"url":"https://example.com/image.jpg","width":100,"height":50}},"video":{"dashUrl":"https://example.com/dash","hlsUrl":"https://example.com/hls","duration":12,"width":100,"height":50,"hasAudio":true}},"gallery":{"items":[{"id":"item","mediaId":"media","caption":"cap","url":"https://example.com/g.jpg","width":10,"height":20}]},"subreddit":{"name":"Android","prefixedName":"r/Android"}}]}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(PostsByIdsResponse::class.java).fromJson(inputJson)!!
-        val actualNode = actualResponse.data!!.postsInfoByIds.single()
+        val actualNode = requireNotNull(requireNotNull(actualResponse.data?.postsInfoByIds).single())
         assertEquals("t3_1wzvqsb", actualNode.id)
         assertEquals("A post", actualNode.postTitle)
         assertEquals(42, actualNode.score)
@@ -60,12 +76,25 @@ class GraphQlModelsTest {
     }
 
     @Test
+    fun `parses deleted and null posts by ids elements`() {
+        val inputJson =
+            """{"data":{"postsInfoByIds":[null,{"__typename":"DeletedSubredditPost","id":"t3_deleted"}]}}"""
+        val actualResponse =
+            Moshi.Builder().build().adapter(PostsByIdsResponse::class.java).fromJson(inputJson)!!
+        val actualNodes = requireNotNull(actualResponse.data?.postsInfoByIds)
+        assertEquals(2, actualNodes.size)
+        assertNull(actualNodes[0])
+        assertEquals("DeletedSubredditPost", actualNodes[1]?.typename)
+    }
+
+    @Test
     fun `parses a subreddit feed response`() {
         val inputJson =
             """{"data":{"subredditV3":{"elements":{"pageInfo":{"endCursor":"t3_abc","hasNextPage":true},"edges":[{"node":{"groupId":"t3_abc"}},{"node":null}]}}}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(SubredditFeedResponse::class.java).fromJson(inputJson)!!
-        val actualElements = actualResponse.data!!.subredditV3.elements
+        val actualElements =
+            requireNotNull(requireNotNull(actualResponse.data?.subredditV3).elements)
         assertEquals("t3_abc", actualElements.pageInfo.endCursor)
         assertTrue(actualElements.pageInfo.hasNextPage)
         assertEquals(2, actualElements.edges.size)
@@ -79,7 +108,8 @@ class GraphQlModelsTest {
             """{"data":{"profileFeed":{"elements":{"pageInfo":{"endCursor":null,"hasNextPage":false},"edges":[{"node":{"groupId":"t3_xyz"}}]}}}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(SubmittedPostsResponse::class.java).fromJson(inputJson)!!
-        val actualElements = actualResponse.data!!.profileFeed.elements
+        val actualElements =
+            requireNotNull(requireNotNull(actualResponse.data?.profileFeed).elements)
         assertTrue(!actualElements.pageInfo.hasNextPage)
         assertEquals("t3_xyz", actualElements.edges.single().node!!.groupId)
     }
@@ -87,10 +117,10 @@ class GraphQlModelsTest {
     @Test
     fun `parses a subreddit info response`() {
         val inputJson =
-            """{"data":{"subredditInfoByName":{"id":"t5_1","name":"Android","prefixedName":"r/Android","title":"Android","path":"/r/Android/","createdAt":"2010-01-01T00:00:00.000000+0000","publicDescriptionText":"desc","description":{"markdown":"desc","richtext":"desc"},"isNsfw":false,"isQuarantined":false,"subscribersCount":1000000.0,"communityStats":{"weeklyActiveUsersCount":123},"styles":{"bannerBackgroundImage":null,"icon":"https://example.com/icon.png","legacyBannerBackgroundImage":"https://example.com/legacy-banner.png","legacyIcon":{"url":"https://example.com/legacy-icon.png"},"legacyPrimaryColor":"#00ff00","mobileBannerImage":"https://example.com/mobile-banner.png","primaryColor":"#ff0000"},"wiki":{"indexPage":{"status":"MODERATOR_ONLY"}}}}}"""
+            """{"data":{"subredditInfoByName":{"__typename":"Subreddit","id":"t5_1","name":"Android","prefixedName":"r/Android","title":"Android","path":"/r/Android/","createdAt":"2010-01-01T00:00:00.000000+0000","publicDescriptionText":"desc","description":{"markdown":"desc","richtext":"desc"},"isNsfw":false,"isQuarantined":false,"subscribersCount":1000000.0,"communityStats":{"weeklyActiveUsersCount":123},"styles":{"bannerBackgroundImage":null,"icon":"https://example.com/icon.png","legacyBannerBackgroundImage":"https://example.com/legacy-banner.png","legacyIcon":{"url":"https://example.com/legacy-icon.png"},"legacyPrimaryColor":"#00ff00","mobileBannerImage":"https://example.com/mobile-banner.png","primaryColor":"#ff0000"},"wiki":{"indexPage":{"status":"MODERATOR_ONLY"}}}}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(SubredditInfoResponse::class.java).fromJson(inputJson)!!
-        val actualInfo = actualResponse.data!!.subredditInfoByName
+        val actualInfo = requireNotNull(actualResponse.data?.subredditInfoByName)
         val actualStyles = actualInfo.styles!!
         assertEquals("Android", actualInfo.name)
         assertEquals("Android", actualInfo.title)
@@ -110,10 +140,10 @@ class GraphQlModelsTest {
     @Test
     fun `parses a user profile response`() {
         val inputJson =
-            """{"data":{"redditorInfoByName":{"id":"t2_1","name":"author","prefixedName":"u/author","icon":{"url":"https://example.com/icon.png","width":256,"height":256},"snoovatarIcon":{"url":"https://example.com/snoo.png"},"isEmployee":false,"karma":{"total":1234},"profileInfo":{"createdAt":"2015-01-01T00:00:00.000000+0000","publicDescriptionText":"bio","title":"Title","isNsfw":false}}}}"""
+            """{"data":{"redditorInfoByName":{"__typename":"Redditor","id":"t2_1","name":"author","prefixedName":"u/author","icon":{"url":"https://example.com/icon.png","width":256,"height":256},"snoovatarIcon":{"url":"https://example.com/snoo.png"},"isEmployee":false,"karma":{"total":1234},"profileInfo":{"createdAt":"2015-01-01T00:00:00.000000+0000","publicDescriptionText":"bio","title":"Title","isNsfw":false}}}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(UserProfileResponse::class.java).fromJson(inputJson)!!
-        val actualUser = actualResponse.data!!.redditorInfoByName
+        val actualUser = requireNotNull(actualResponse.data?.redditorInfoByName)
         assertEquals("author", actualUser.name)
         assertEquals(1234, actualUser.karma!!.total)
         assertEquals("Title", actualUser.profileInfo!!.title)
@@ -123,10 +153,12 @@ class GraphQlModelsTest {
     @Test
     fun `parses a submitted comments response`() {
         val inputJson =
-            """{"data":{"redditorInfoByName":{"comments":{"pageInfo":{"endCursor":"t1_z","hasNextPage":false},"edges":[{"node":{"id":"t1_a","createdAt":"2026-10-07T15:47:48.255000+0000","score":5,"content":{"html":"<p>hi</p>","markdown":"hi"},"postInfo":{"id":"t3_1","title":"Post title"}}}]}}}}"""
+            """{"data":{"redditorInfoByName":{"comments":{"pageInfo":{"endCursor":"t1_z","hasNextPage":false},"edges":[{"node":{"__typename":"Comment","id":"t1_a","createdAt":"2026-10-07T15:47:48.255000+0000","score":5,"content":{"html":"<p>hi</p>","markdown":"hi"},"postInfo":{"id":"t3_1","title":"Post title"}}}]}}}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(SubmittedCommentsResponse::class.java).fromJson(inputJson)!!
-        val actualComments = actualResponse.data!!.redditorInfoByName.comments
+        val actualComments = requireNotNull(
+            requireNotNull(actualResponse.data?.redditorInfoByName).comments,
+        )
         assertEquals("t1_z", actualComments.pageInfo.endCursor)
         val actualComment = actualComments.edges.single().node
         assertEquals("t1_a", actualComment.id)
@@ -137,10 +169,10 @@ class GraphQlModelsTest {
     @Test
     fun `parses a live comments by ids response`() {
         val inputJson =
-            """{"data":{"commentsByIds":[{"id":"t1_a","createdAt":"2026-10-07T15:47:48.255000+0000","content":{"html":"<p>hi</p>","markdown":"hi","preview":"hi"},"authorInfo":{"name":"a"},"score":1,"voteState":"NONE","isOP":true,"isStickied":false,"isScoreHidden":false,"isRemoved":false,"isLocked":false,"permalink":"/r/Android/comments/1/a/"}]}}"""
+            """{"data":{"commentsByIds":[{"__typename":"Comment","id":"t1_a","createdAt":"2026-10-07T15:47:48.255000+0000","content":{"html":"<p>hi</p>","markdown":"hi","preview":"hi"},"authorInfo":{"name":"a"},"score":1,"voteState":"NONE","isOP":true,"isStickied":false,"isScoreHidden":false,"isRemoved":false,"isLocked":false,"permalink":"/r/Android/comments/1/a/"}]}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(LiveCommentsByIdsResponse::class.java).fromJson(inputJson)!!
-        val actualComment = actualResponse.data!!.commentsByIds.single()
+        val actualComment = requireNotNull(actualResponse.data?.commentsByIds).single()
         assertEquals("t1_a", actualComment.id)
         assertTrue(actualComment.isOP)
         assertEquals("NONE", actualComment.voteState)
@@ -149,10 +181,10 @@ class GraphQlModelsTest {
     @Test
     fun `parses a search posts response`() {
         val inputJson =
-            """{"data":{"search":{"general":{"posts":{"pageInfo":{"endCursor":"t3_2","hasNextPage":true},"edges":[{"node":{"id":"t3_1","postTitle":"Result","permalink":"/r/Android/comments/1/a/","url":"https://example.com","createdAt":"2026-10-07T15:47:48.255000+0000","subreddit":{"name":"Android","prefixedName":"r/Android"}}}]}}}}}"""
+            """{"data":{"search":{"general":{"posts":{"pageInfo":{"endCursor":"t3_2","hasNextPage":true},"edges":[{"node":{"__typename":"SubredditPost","id":"t3_1","postTitle":"Result","permalink":"/r/Android/comments/1/a/","url":"https://example.com","createdAt":"2026-10-07T15:47:48.255000+0000","subreddit":{"name":"Android","prefixedName":"r/Android"}}}]}}}}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(SearchPostsResponse::class.java).fromJson(inputJson)!!
-        val actualPosts = actualResponse.data!!.search.general.posts!!
+        val actualPosts = requireNotNull(actualResponse.data?.search?.general?.posts)
         assertEquals("t3_2", actualPosts.pageInfo.endCursor)
         val actualNode = actualPosts.edges.single().node
         assertEquals("t3_1", actualNode.id)
@@ -166,7 +198,7 @@ class GraphQlModelsTest {
             """{"data":{"search":{"general":{"authors":{"pageInfo":{"endCursor":"t2_1","hasNextPage":false},"edges":[{"node":{"id":"t2_1","name":"author","prefixedName":"u/author","icon_96":{"url":"https://example.com/icon-96.png","dimensions":{"width":96,"height":96}},"karma":{"total":10},"profile":{"isNsfw":true,"createdAt":"2026-10-07T15:47:48.255000+0000","styles":{"legacyIcon":{"url":"https://example.com/legacy-icon.png"}}}}}]}}}}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(SearchPeopleResponse::class.java).fromJson(inputJson)!!
-        val actualAuthors = actualResponse.data!!.search.general.authors!!
+        val actualAuthors = requireNotNull(actualResponse.data?.search?.general?.authors)
         assertEquals("t2_1", actualAuthors.pageInfo.endCursor)
         val actualNode = actualAuthors.edges.single().node
         assertEquals("author", actualNode.name)
@@ -183,11 +215,33 @@ class GraphQlModelsTest {
             """{"data":{"targetableCommunityInfo":[{"subredditInfo":{"name":"Android"},"iconUrl":"https://example.com/icon.png","description":"desc","subscriberCount":1000}]}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(CommunitySearchResponse::class.java).fromJson(inputJson)!!
-        val actualCommunity = actualResponse.data!!.targetableCommunityInfo.single()
+        val actualCommunity = requireNotNull(actualResponse.data?.targetableCommunityInfo).single()
         assertEquals("Android", actualCommunity.subredditInfo!!.name)
         assertNull(actualCommunity.subredditInfo!!.prefixedName)
         assertEquals(1000, actualCommunity.subscriberCount)
         assertEquals("desc", actualCommunity.description)
+    }
+
+    @Test
+    fun `parses null targetable community info`() {
+        val inputJson = """{"data":{"targetableCommunityInfo":null}}"""
+        val actualResponse =
+            Moshi.Builder().build().adapter(CommunitySearchResponse::class.java).fromJson(inputJson)!!
+        assertNull(actualResponse.data?.targetableCommunityInfo)
+        assertNull(actualResponse.errors)
+    }
+
+    @Test
+    fun `parses a submitted comment post subreddit`() {
+        val inputJson =
+            """{"data":{"redditorInfoByName":{"comments":{"pageInfo":{"endCursor":null,"hasNextPage":false},"edges":[{"node":{"id":"t1_a","createdAt":"2026-10-07T15:47:48.255000+0000","postInfo":{"id":"t3_1","title":"Post title","subreddit":{"prefixedName":"r/Android"}}}}]}}}}"""
+        val actualResponse =
+            Moshi.Builder().build().adapter(SubmittedCommentsResponse::class.java).fromJson(inputJson)!!
+        val actualPostInfo =
+            requireNotNull(
+                actualResponse.data?.redditorInfoByName?.comments?.edges?.single()?.node?.postInfo,
+            )
+        assertEquals("r/Android", actualPostInfo.subreddit?.prefixedName)
     }
 
     @Test
@@ -196,8 +250,9 @@ class GraphQlModelsTest {
             """{"data":{"postInfoById":{"id":"t3_1","title":"t","commentCount":0,"commentForest":{"pageInfo":{"hasNextPage":false},"trees":[],"unexpectedField":true},"unexpectedField":true}},"unexpectedRoot":{"a":1}}"""
         val actualResponse =
             Moshi.Builder().build().adapter(PostCommentsResponse::class.java).fromJson(inputJson)!!
-        assertEquals("t3_1", actualResponse.data!!.postInfoById.id)
-        assertTrue(actualResponse.data!!.postInfoById.commentForest.trees.isEmpty())
+        val actualPostInfo = requireNotNull(actualResponse.data?.postInfoById)
+        assertEquals("t3_1", actualPostInfo.id)
+        assertTrue(actualPostInfo.commentForest.trees.isEmpty())
     }
 
     @Test
