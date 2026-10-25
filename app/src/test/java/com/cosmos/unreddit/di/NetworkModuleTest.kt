@@ -1,7 +1,6 @@
 package com.cosmos.unreddit.di
 
 import android.content.Context
-import com.cosmos.unreddit.data.remote.RedditCommentsPathInterceptor
 import com.cosmos.unreddit.data.remote.api.reddit.RedditAuthInterceptor
 import com.cosmos.unreddit.data.remote.api.reddit.auth.RedditTokenManager
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.RedditGraphQlHeadersInterceptor
@@ -14,20 +13,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NetworkModuleTest {
-    @Test
-    fun `auth reddit client forces http11`() {
-        val client =
-            NetworkModule.provideAuthRedditOkHttpClient(
-                RedditAuthInterceptor(
-                    RedditTokenManager(),
-                    CoroutineScope(SupervisorJob()),
-                ),
-            )
-
-        assertEquals(listOf(Protocol.HTTP_1_1), client.protocols)
-        assertTrue(client.interceptors.any { it is RedditCommentsPathInterceptor })
-    }
-
     @Test
     fun `graphql client has auth and graphql header interceptors`() {
         // Arrange

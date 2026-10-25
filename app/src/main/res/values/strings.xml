@@ -124,12 +124,6 @@
     <string name="dialog_credit_show_website">Show Website</string>
     <string name="dialog_credit_show_license">Show License</string>
 
-    <string name="dialog_reddit_source_title">Reddit Source</string>
-
-    <string name="dialog_reddit_source_disclaimer_title">Disclaimer</string>
-    <string name="dialog_reddit_source_disclaimer_body">This is an experimental feature.\nTeddit doesn\'t provide an API for all of Reddit\'s content. Therefore, some requests will still be sent to reddit.com.</string>
-    <string name="dialog_reddit_source_scrap_disclaimer_body">This is an experimental feature.\nSome data are missing compared to the official APIs, and some features are not implemented/implementable.\nThis source uses old.reddit.com.</string>
-
     <string name="empty_data">Nothing to see here…</string>
     <string name="empty_data_subscriptions">You have no subscriptions yet.\nUse the search feature to look for Subreddits.</string>
 
@@ -149,11 +143,6 @@
     <string name="preference_show_nsfw">Show NSFW content</string>
     <string name="preference_show_nsfw_preview">Show NSFW preview</string>
     <string name="preference_show_spoiler_preview">Show Spoiler preview</string>
-
-    <string name="preference_reddit_source">Reddit Source</string>
-    <string name="preference_reddit_source_reddit">Reddit</string>
-    <string name="preference_reddit_source_reddit_scrap">Reddit (Web Scraping)</string>
-    <string name="preference_reddit_source_teddit">Teddit</string>
 
     <string name="preference_backup">Import/Export</string>
 
@@ -207,10 +196,6 @@
 
     <string name="dialog_privacy_enhancer_title">Privacy Enhancer</string>
     <string name="dialog_privacy_enhancer_message">Would you like to redirect %1$s to %2$s?</string>
-
-    <string name="dialog_restart_required_title">Restart Required</string>
-    <string name="dialog_restart_required_message">A restart of the app is required to take the change into account.\nWould you like to restart now?</string>
-    <string name="dialog_restart_required_later">Maybe Later</string>
 
     <string name="profile_name_length_error">Profile name must be between 3 and 20 characters</string>
     <string name="profile_already_exists_error">Profile already exists</string>
@@ -275,7 +260,7 @@
     <string name="toast_clipboard_copied_email">Email copied to clipboard</string>
 
     <string name="dialog_policy_disclaimer_title">Reddit\'s API Policy Change</string>
-    <string name="dialog_policy_disclaimer_message">In the coming weeks, a new policy regarding Reddit\'s API will come into effect. Reddit will stop providing a free API (among other things), thus putting a stop to most third-party apps, including Stealth.\n\nTo try to circumvent that issue, a new source for the content has been implemented (available in the preferences, under Reddit Source) based on old.reddit.com. It might not work for long after the policy change, or even at all, but at least it does not rely on any API.\n\nYou can find more information about the new policy <a href="https://www.reddit.com/r/reddit/comments/12qwagm/an_update_regarding_reddits_api/">here</a>.\n\nPlease feel free to use the contact information available in the About section (email, GitLab, or the Matrix channel) if you have any questions.</string>
+    <string name="dialog_policy_disclaimer_message">In the coming weeks, a new policy regarding Reddit\'s API will come into effect. Reddit will stop providing a free API (among other things), thus putting a stop to most third-party apps, including Stealth.\n\nYou can find more information about the new policy <a href="https://www.reddit.com/r/reddit/comments/12qwagm/an_update_regarding_reddits_api/">here</a>.\n\nPlease feel free to use the contact information available in the About section (email, GitLab, or the Matrix channel) if you have any questions.</string>
 
     <string name="snackbar_policy_disclaimer_message">%1$s might stop working soon</string>
     <string name="snackbar_policy_disclaimer_action">Learn More</string>
