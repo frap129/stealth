@@ -25,7 +25,8 @@ class SmartPostListDataSource(
     private val query: List<String>,
     private val sorting: Sorting,
     private val defaultDispatcher: CoroutineDispatcher,
-    @Suppress("UNUSED_PARAMETER") mainImmediateDispatcher: CoroutineDispatcher
+    @Suppress("UNUSED_PARAMETER") mainImmediateDispatcher: CoroutineDispatcher,
+    private val excludePinnedPosts: Boolean = false,
 ) : PagingSource<List<String>, Child>() {
 
     override val keyReuseSupported: Boolean = true
@@ -85,6 +86,7 @@ class SmartPostListDataSource(
             query.indices
                 .mapNotNull { responses[it]?.data?.children }
                 .sort(sorting)
+                .filterNot { child -> excludePinnedPosts && (child as PostChild).data.isStickied }
                 .distinctBy { (it as PostChild).data.name }
         }
 

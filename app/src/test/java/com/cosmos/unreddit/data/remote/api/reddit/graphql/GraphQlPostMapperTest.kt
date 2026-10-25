@@ -609,6 +609,23 @@ class GraphQlPostMapperTest {
         assertEquals(100, actualMetadataImage.width)
     }
 
+    @Test
+    fun `maps stickied flag from a posts by ids response`() {
+        val inputJson =
+            """{"data":{"postsInfoByIds":[{"__typename":"SubredditPost","id":"t3_pinned","isStickied":true}]}}"""
+        val actualResponse =
+            Moshi.Builder()
+                .build()
+                .adapter(PostsByIdsResponse::class.java)
+                .fromJson(inputJson)!!
+        val actualNode: GraphQlPostNode =
+            requireNotNull(requireNotNull(actualResponse.data?.postsInfoByIds).single())
+
+        val actualPost: PostData = GraphQlPostMapper().toPostData(actualNode)
+
+        assertTrue(actualPost.isStickied)
+    }
+
     private companion object {
         private const val CREATED_AT: String = "2026-10-07T15:47:48.255000+0000"
         private const val EXPECTED_CREATED_AT_SECONDS: Long = 1791388068L

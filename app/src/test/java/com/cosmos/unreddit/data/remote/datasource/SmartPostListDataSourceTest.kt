@@ -26,7 +26,7 @@ class SmartPostListDataSourceTest {
         val inputCalls = AtomicInteger(0)
         val inputCurrent = AtomicInteger(0)
         val inputMax = AtomicInteger(0)
-        val inputSource: BaseRedditSource =
+        val mockSource: BaseRedditSource =
             object : BaseRedditSource by unimplementedSource() {
                 override suspend fun getSubreddit(
                     subreddit: String,
@@ -54,7 +54,7 @@ class SmartPostListDataSourceTest {
             }
         val inputMain = UnconfinedTestDispatcher(testScheduler)
         val inputDataSource = SmartPostListDataSource(
-            inputSource,
+            mockSource,
             listOf("a", "b", "c", "d", "e"),
             Sorting(Sort.HOT),
             Dispatchers.Default,
@@ -80,6 +80,118 @@ class SmartPostListDataSourceTest {
         val actualSecondIds = actualSecondPage.data.map { (it as PostChild).data.name }.toSet()
         assertTrue(actualFirstIds.intersect(actualSecondIds).isEmpty())
     }
+
+    @Test
+    fun `home hot excludes pinned posts`() = runTest {
+        val inputPosts: Map<String, List<PostData>> =
+            mapOf(
+                "a" to
+                    listOf(
+                        postData("pinned", isStickied = true),
+                        postData("a_recent"),
+                    ),
+                "b" to listOf(postData("b_recent")),
+            )
+        val mockSource: BaseRedditSource = sourceWithPosts(inputPosts)
+        val inputDataSource =
+            SmartPostListDataSource(
+                mockSource,
+                listOf("a", "b"),
+                Sorting(Sort.HOT),
+                Dispatchers.Default,
+                UnconfinedTestDispatcher(testScheduler),
+                excludePinnedPosts = true,
+            )
+
+        val actualResult =
+            inputDataSource.load(
+                PagingSource.LoadParams.Refresh<List<String>>(null, 25, false),
+            )
+
+        assertTrue(actualResult is PagingSource.LoadResult.Page<*, *>)
+        val actualPage = actualResult as PagingSource.LoadResult.Page<List<String>, Child>
+        assertEquals(
+            setOf("a_recent", "b_recent"),
+            actualPage.data.map { (it as PostChild).data.name }.toSet(),
+        )
+    }
+
+    @Test
+    fun `single subscription home hot excludes pinned posts`() = runTest {
+        val inputPosts: List<PostData> =
+            listOf(
+                postData("pinned", isStickied = true),
+                postData("recent"),
+            )
+        val mockSource: BaseRedditSource = sourceWithPosts(mapOf("a" to inputPosts))
+        val inputDataSource =
+            SmartPostListDataSource(
+                mockSource,
+                listOf("a"),
+                Sorting(Sort.HOT),
+                Dispatchers.Default,
+                UnconfinedTestDispatcher(testScheduler),
+                excludePinnedPosts = true,
+            )
+
+        val actualResult =
+            inputDataSource.load(
+                PagingSource.LoadParams.Refresh<List<String>>(null, 25, false),
+            )
+
+        assertTrue(actualResult is PagingSource.LoadResult.Page<*, *>)
+        val actualPage = actualResult as PagingSource.LoadResult.Page<List<String>, Child>
+        assertEquals(
+            listOf("recent"),
+            actualPage.data.map { (it as PostChild).data.name },
+        )
+    }
+
+    @Test
+    fun `subreddit hot keeps pinned posts`() = runTest {
+        val inputPosts: List<PostData> =
+            listOf(
+                postData("pinned", isStickied = true),
+                postData("recent"),
+            )
+        val mockSource: BaseRedditSource = sourceWithPosts(mapOf("a" to inputPosts))
+        val inputDataSource =
+            SmartPostListDataSource(
+                mockSource,
+                listOf("a"),
+                Sorting(Sort.HOT),
+                Dispatchers.Default,
+                UnconfinedTestDispatcher(testScheduler),
+            )
+
+        val actualResult =
+            inputDataSource.load(
+                PagingSource.LoadParams.Refresh<List<String>>(null, 25, false),
+            )
+
+        assertTrue(actualResult is PagingSource.LoadResult.Page<*, *>)
+        val actualPage = actualResult as PagingSource.LoadResult.Page<List<String>, Child>
+        assertEquals(
+            setOf("pinned", "recent"),
+            actualPage.data.map { (it as PostChild).data.name }.toSet(),
+        )
+    }
+
+    private fun sourceWithPosts(postsBySubreddit: Map<String, List<PostData>>): BaseRedditSource =
+        object : BaseRedditSource by unimplementedSource() {
+            override suspend fun getSubreddit(
+                subreddit: String,
+                sort: Sort,
+                timeSorting: TimeSorting?,
+                after: String?,
+            ): Listing {
+                val posts: List<PostData> = postsBySubreddit.getValue(subreddit)
+                return Listing(
+                    "Listing",
+                    ListingData(null, posts.size, posts.map { PostChild(it) }, null, null),
+                )
+            }
+        }
 
     private fun unimplementedSource(): BaseRedditSource =
         object : BaseRedditSource {
@@ -152,7 +264,10 @@ class SmartPostListDataSourceTest {
 
     private fun unsupported(): Nothing = throw UnsupportedOperationException()
 
-    private fun postData(id: String): PostData =
+    private fun postData(
+        id: String,
+        isStickied: Boolean = false,
+    ): PostData =
         PostData(
             subreddit = "subreddit",
             linkFlairRichText = emptyList(),
@@ -183,7 +298,7 @@ class SmartPostListDataSourceTest {
             author = "author",
             commentsNumber = 0,
             permalink = "/r/subreddit/comments/$id",
-            isStickied = false,
+            isStickied = isStickied,
             url = "https://example.com/$id",
             created = 0,
             media = null,

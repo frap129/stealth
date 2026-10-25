@@ -56,13 +56,7 @@ class PostListRepository @Inject constructor(
         pageSize: Int = DEFAULT_LIMIT
     ): Flow<PagingData<Child>> {
         return Pager(PagingConfig(pageSize = pageSize)) {
-            SmartPostListDataSource(
-                source,
-                listOf(subreddit),
-                sorting,
-                defaultDispatcher,
-                mainImmediateDispatcher
-            )
+            getPostListDataSource(subreddit, sorting)
         }.flow
     }
 
@@ -72,15 +66,35 @@ class PostListRepository @Inject constructor(
         pageSize: Int = DEFAULT_LIMIT
     ): Flow<PagingData<Child>> {
         return Pager(PagingConfig(pageSize = pageSize)) {
-            SmartPostListDataSource(
-                source,
-                subreddit,
-                sorting,
-                defaultDispatcher,
-                mainImmediateDispatcher
-            )
+            getPostListDataSource(subreddit, sorting)
         }.flow
     }
+
+    internal fun getPostListDataSource(
+        subreddit: String,
+        sorting: Sorting,
+    ): SmartPostListDataSource =
+        SmartPostListDataSource(
+            source,
+            listOf(subreddit),
+            sorting,
+            defaultDispatcher,
+            mainImmediateDispatcher,
+            excludePinnedPosts = false,
+        )
+
+    internal fun getPostListDataSource(
+        subreddit: List<String>,
+        sorting: Sorting,
+    ): SmartPostListDataSource =
+        SmartPostListDataSource(
+            source,
+            subreddit,
+            sorting,
+            defaultDispatcher,
+            mainImmediateDispatcher,
+            excludePinnedPosts = true,
+        )
 
     fun getSubredditInfo(subreddit: String): Flow<AboutChild> = flow {
         emit(source.getSubredditInfo(subreddit) as AboutChild)
