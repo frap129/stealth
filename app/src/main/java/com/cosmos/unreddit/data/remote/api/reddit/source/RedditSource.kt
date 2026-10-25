@@ -12,11 +12,14 @@ import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommunitySearchR
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlComment
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlError
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFeedElements
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFeedRoot
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlPageInfo
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlPostInfo
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlPostNode
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlSubmittedComment
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.LiveCommentsByIdsResponse
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PopularFeedData
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PopularFeedResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PostCommentsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PostsByIdsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SearchPeopleResponse
@@ -62,6 +65,8 @@ class RedditSource @Inject constructor(
 
     private val subredditFeedAdapter: JsonAdapter<SubredditFeedResponse> =
         moshi.adapter(SubredditFeedResponse::class.java)
+    private val popularFeedAdapter: JsonAdapter<PopularFeedResponse> =
+        moshi.adapter(PopularFeedResponse::class.java)
     private val submittedPostsAdapter: JsonAdapter<SubmittedPostsResponse> =
         moshi.adapter(SubmittedPostsResponse::class.java)
     private val postsByIdsAdapter: JsonAdapter<PostsByIdsResponse> =
@@ -92,6 +97,9 @@ class RedditSource @Inject constructor(
         timeSorting: TimeSorting?,
         after: String?,
     ): Listing = withContext(ioDispatcher) {
+        if (subreddit.equals(POPULAR_FEED, ignoreCase = true)) {
+            return@withContext popularListing(sort, timeSorting, after)
+        }
         val variables: Map<String, Any?> =
             buildVariables(
                 "subredditName" to subreddit,
@@ -400,6 +408,30 @@ class RedditSource @Inject constructor(
         return listing(children, cursor)
     }
 
+    private suspend fun popularListing(
+        sort: Sort,
+        timeSorting: TimeSorting?,
+        after: String?,
+    ): Listing {
+        val variables: Map<String, Any?> =
+            buildVariables(
+                "sort" to sort.toPostFeedSort(),
+                "time" to timeSorting?.toFeedRange(),
+                "after" to after,
+            )
+        val response: PopularFeedResponse =
+            parse(
+                popularFeedAdapter,
+                client.execute(RedditGraphQlOperations.PopularFeedSdui, variables),
+            )
+        val data: PopularFeedData = requireData(response.data, response.errors)
+        val feed: GraphQlFeedRoot =
+            requireField(data.popularV3, response.errors, "Missing popular feed")
+        val elements: GraphQlFeedElements =
+            requireField(feed.elements, response.errors, "Missing feed elements")
+        return postsListing(elements, useHasNextPage = false)
+    }
+
     private suspend fun postsByIds(ids: List<String>): List<GraphQlPostNode> {
         if (ids.isEmpty()) return emptyList()
         val response: PostsByIdsResponse =
@@ -595,6 +627,7 @@ class RedditSource @Inject constructor(
 
     private companion object {
         private const val LISTING_KIND: String = "Listing"
+        private const val POPULAR_FEED: String = "popular"
         private const val POST_ID_PREFIX: String = "t3_"
         private const val SEARCH_PRODUCT_SURFACE: String = "SEARCH"
         private const val EMPTY_RESPONSE: String = "Empty GraphQL response"

@@ -8,6 +8,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.graphql.RedditGraphQlOperation
 import com.cosmos.unreddit.data.remote.api.reddit.model.AboutChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.AboutUserChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.CommentChild
+import com.cosmos.unreddit.data.remote.api.reddit.model.Listing
 import com.cosmos.unreddit.data.remote.api.reddit.model.MoreChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.PostChild
 import com.squareup.moshi.Moshi
@@ -48,6 +49,27 @@ class RedditSourceTest {
             assertEquals(listOf("t3_b", "t3_a"), executor.calls[1].variables["ids"])
             assertEquals(true, executor.calls[1].variables["includeExtendedVideoAsset"])
             assertEquals(true, executor.calls[1].variables["includePlaybackMp4s"])
+        }
+
+    @Test
+    fun `popular feed uses the popular operation and maps posts`() =
+        runTest {
+            val source: RedditSource =
+                createSource(
+                    popularFeedJson(listOf("t3_b", "t3_a"), "t3_cursor"),
+                    postsByIdsJson(postJson("t3_a", "A"), postJson("t3_b", "B")),
+                )
+            val actualListing: Listing =
+                source.getSubreddit("popular", Sort.TOP, TimeSorting.DAY, null)
+            val actualChildren: List<String> =
+                actualListing.data.children.map { (it as PostChild).data.name }
+            assertEquals(listOf("t3_b", "t3_a"), actualChildren)
+            assertEquals("t3_cursor", actualListing.data.after)
+            assertEquals(RedditGraphQlOperations.PopularFeedSdui, executor.calls[0].operation)
+            assertEquals("TOP", executor.calls[0].variables["sort"])
+            assertEquals("DAY", executor.calls[0].variables["time"])
+            assertFalse(executor.calls[0].variables.containsKey("subredditName"))
+            assertEquals(RedditGraphQlOperations.PostsByIds, executor.calls[1].operation)
         }
 
     @Test
@@ -850,6 +872,16 @@ class RedditSourceTest {
         val edges = ids.joinToString(",") { """{"node":{"groupId":"$it"}}""" }
         return """
             {"data":{"subredditV3":{"elements":{
+              "pageInfo":{"endCursor":${endCursor.jsonValue()}},
+              "edges":[$edges]
+            }}}}
+            """.trimIndent()
+    }
+
+    private fun popularFeedJson(ids: List<String>, endCursor: String?): String {
+        val edges: String = ids.joinToString(",") { """{"node":{"groupId":"$it"}}""" }
+        return """
+            {"data":{"popularV3":{"elements":{
               "pageInfo":{"endCursor":${endCursor.jsonValue()}},
               "edges":[$edges]
             }}}}
