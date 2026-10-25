@@ -62,6 +62,22 @@ class GraphQlUserMapperTest {
     }
 
     @Test
+    fun `maps a suspended user profile with minimal identity`() {
+        val inputProfile: GraphQlUserProfile =
+            GraphQlUserProfile(
+                typename = "DeletedRedditor",
+                id = "t2_deleted",
+            )
+        val inputMapper: GraphQlUserMapper = GraphQlUserMapper()
+        val actualUser: AboutUserData =
+            inputMapper.toAboutUserData(inputProfile, isSuspended = true)
+        assertEquals("t2_deleted", actualUser.id)
+        assertEquals("", actualUser.name)
+        assertEquals(true, actualUser.isSuspended)
+        assertNull(actualUser.subreddit)
+    }
+
+    @Test
     fun `maps absent optional user profile fields to defaults`() {
         val inputProfile: GraphQlUserProfile =
             GraphQlUserProfile(
@@ -292,10 +308,12 @@ class GraphQlUserMapperTest {
     }
 
     private fun parsePersonNode(inputJson: String): GraphQlPersonNode =
-        Moshi.Builder().build()
-            .adapter(SearchPeopleResponse::class.java)
-            .fromJson(inputJson)!!
-            .data!!.search.general.authors!!.edges.single().node
+        requireNotNull(
+            Moshi.Builder().build()
+                .adapter(SearchPeopleResponse::class.java)
+                .fromJson(inputJson)!!
+                .data?.search?.general?.authors,
+        ).edges.single().node
 
     private companion object {
         private const val CREATED_AT: String = "2026-10-07T15:47:48.255000+0000"

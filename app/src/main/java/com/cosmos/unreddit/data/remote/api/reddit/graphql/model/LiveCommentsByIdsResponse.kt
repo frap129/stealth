@@ -9,4 +9,4 @@ data class LiveCommentsByIdsResponse(
 )
 
 @JsonClass(generateAdapter = true)
-data class LiveCommentsData(val commentsByIds: List<GraphQlComment>)
+data class LiveCommentsData(val commentsByIds: List<GraphQlComment>? = null)

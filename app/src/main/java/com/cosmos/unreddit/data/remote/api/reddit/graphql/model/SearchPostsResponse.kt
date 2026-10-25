@@ -9,10 +9,10 @@ data class SearchPostsResponse(
 )
 
 @JsonClass(generateAdapter = true)
-data class SearchPostsData(val search: GraphQlSearch)
+data class SearchPostsData(val search: GraphQlSearch? = null)
 
 @JsonClass(generateAdapter = true)
-data class GraphQlSearch(val general: GraphQlGeneralSearch)
+data class GraphQlSearch(val general: GraphQlGeneralSearch? = null)
 
 @JsonClass(generateAdapter = true)
 data class GraphQlGeneralSearch(

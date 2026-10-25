@@ -2,6 +2,7 @@ package com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper
 
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlGallery
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlGalleryItem
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlGalleryMedia
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlMedia
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlMediaSource
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlPostNode
@@ -25,9 +26,9 @@ class GraphQlPostMapper @Inject constructor() {
             subreddit = node.subreddit?.name.orEmpty(),
             linkFlairRichText = emptyList(),
             authorFlairRichText = null,
-            title = node.postTitle,
+            title = node.postTitle.orEmpty(),
             prefixedSubreddit = node.subreddit?.prefixedName ?: "r/${node.subreddit?.name.orEmpty()}",
-            name = node.id,
+            name = node.id.orEmpty(),
             ratio = node.upvoteRatio,
             totalAwards = node.awardings.sumOf { it.total },
             isOC = false,
@@ -50,10 +51,10 @@ class GraphQlPostMapper @Inject constructor() {
             distinguished = node.distinguishedAs,
             author = node.authorInfo?.name.orEmpty(),
             commentsNumber = node.commentCount,
-            permalink = node.permalink,
+            permalink = node.permalink.orEmpty(),
             isStickied = node.isStickied,
-            url = node.url,
-            created = GraphQlTimestamp.toEpochSeconds(node.createdAt),
+            url = node.url.orEmpty(),
+            created = GraphQlTimestamp.toEpochSeconds(node.createdAt.orEmpty()),
             media = node.media?.toMedia(),
             mediaMetadata = node.gallery?.toMediaMetadata(),
             isRedditGallery = node.gallery != null,
@@ -65,7 +66,8 @@ class GraphQlPostMapper @Inject constructor() {
         return MediaPreview(
             images = listOf(
                 Image(
-                    imageSource = ImageSource(source.url, source.width, source.height),
+                    imageSource =
+                        ImageSource(source.url, source.resolvedWidth, source.resolvedHeight),
                     resolutions = emptyList(),
                     variants = null,
                 ),
@@ -84,8 +86,8 @@ class GraphQlPostMapper @Inject constructor() {
             embed = null,
             redditVideoPreview = RedditVideoPreview(
                 fallbackUrl = fallbackUrl,
-                width = video.width,
-                height = video.height,
+                width = video.resolvedWidth,
+                height = video.resolvedHeight,
                 duration = video.duration,
                 isGif = false,
             ),
@@ -95,21 +97,67 @@ class GraphQlPostMapper @Inject constructor() {
     private fun GraphQlGallery.toGalleryData(): GalleryData =
         GalleryData(
             items = items.mapNotNull { item: GraphQlGalleryItem ->
-                item.mediaId?.let { mediaId: String -> GalleryDataItem(item.caption, mediaId) }
+                val mediaId: String =
+                    item.media?.id ?: item.mediaId ?: return@mapNotNull null
+                GalleryDataItem(item.caption, mediaId)
             },
         )
 
     private fun GraphQlGallery.toMediaMetadata(): MediaMetadata =
         MediaMetadata(
             items = items.mapNotNull { item: GraphQlGalleryItem ->
-                item.mediaId?.let { mediaId: String ->
-                    GalleryItem(
-                        mimeType = null,
-                        image = item.url?.let { url: String -> GalleryImage(item.height, item.width, url, null) },
-                        previews = null,
-                        id = mediaId,
-                    )
-                }
+                val mediaId: String =
+                    item.media?.id ?: item.mediaId ?: return@mapNotNull null
+                val galleryMedia: GalleryMediaInfo? = item.toGalleryMediaInfo()
+                GalleryItem(
+                    mimeType = null,
+                    image = galleryMedia?.let {
+                        GalleryImage(it.height, it.width, it.url, null)
+                    },
+                    previews = null,
+                    id = mediaId,
+                )
             },
         )
+
+    private fun GraphQlGalleryItem.toGalleryMediaInfo(): GalleryMediaInfo? {
+        val galleryMedia: GraphQlGalleryMedia? = media
+        val mediaUrl: String? = galleryMedia?.url?.takeIf { it.isNotBlank() }
+        if (galleryMedia != null && mediaUrl != null) {
+            return GalleryMediaInfo(
+                url = mediaUrl,
+                width = galleryMedia.dimensions?.width ?: galleryMedia.width,
+                height = galleryMedia.dimensions?.height ?: galleryMedia.height,
+            )
+        }
+        val stillSource: GraphQlMediaSource? = galleryMedia?.still?.source
+        val stillUrl: String? = stillSource?.url?.takeIf { it.isNotBlank() }
+        if (stillSource != null && stillUrl != null) {
+            return GalleryMediaInfo(
+                url = stillUrl,
+                width = stillSource.resolvedWidth,
+                height = stillSource.resolvedHeight,
+            )
+        }
+        val legacyUrl: String = url?.takeIf { it.isNotBlank() } ?: return null
+        return GalleryMediaInfo(legacyUrl, width, height)
+    }
+
+    private val GraphQlMediaSource.resolvedWidth: Int
+        get() = dimensions?.width ?: width
+
+    private val GraphQlMediaSource.resolvedHeight: Int
+        get() = dimensions?.height ?: height
+
+    private val GraphQlStreaming.resolvedWidth: Int
+        get() = dimensions?.width ?: width
+
+    private val GraphQlStreaming.resolvedHeight: Int
+        get() = dimensions?.height ?: height
+
+    private data class GalleryMediaInfo(
+        val url: String,
+        val width: Int,
+        val height: Int,
+    )
 }

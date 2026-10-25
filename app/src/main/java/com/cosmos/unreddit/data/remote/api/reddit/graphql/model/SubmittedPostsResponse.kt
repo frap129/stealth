@@ -9,4 +9,4 @@ data class SubmittedPostsResponse(
 )
 
 @JsonClass(generateAdapter = true)
-data class SubmittedPostsData(val profileFeed: GraphQlFeedRoot)
+data class SubmittedPostsData(val profileFeed: GraphQlFeedRoot? = null)

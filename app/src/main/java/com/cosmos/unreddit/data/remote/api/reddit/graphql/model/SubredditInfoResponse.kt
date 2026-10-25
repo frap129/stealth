@@ -1,5 +1,6 @@
 package com.cosmos.unreddit.data.remote.api.reddit.graphql.model
 
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
@@ -9,16 +10,17 @@ data class SubredditInfoResponse(
 )
 
 @JsonClass(generateAdapter = true)
-data class SubredditInfoData(val subredditInfoByName: GraphQlSubredditInfo)
+data class SubredditInfoData(val subredditInfoByName: GraphQlSubredditInfo? = null)
 
 @JsonClass(generateAdapter = true)
 data class GraphQlSubredditInfo(
-    val id: String,
-    val name: String,
-    val prefixedName: String,
-    val title: String,
-    val path: String,
-    val createdAt: String,
+    @Json(name = "__typename") val typename: String? = null,
+    val id: String? = null,
+    val name: String? = null,
+    val prefixedName: String? = null,
+    val title: String? = null,
+    val path: String? = null,
+    val createdAt: String? = null,
     val publicDescriptionText: String? = null,
     val description: GraphQlContent? = null,
     val isNsfw: Boolean = false,

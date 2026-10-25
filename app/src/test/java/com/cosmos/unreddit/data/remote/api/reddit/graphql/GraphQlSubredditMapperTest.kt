@@ -303,10 +303,12 @@ class GraphQlSubredditMapperTest {
         val inputJson =
             """{"data":{"subredditInfoByName":{"id":"t5_1","name":"Android","prefixedName":"r/Android","title":"Android","path":"/r/Android/","createdAt":"2026-10-07T15:47:48.255000+0000","description":{"markdown":"R&D <3","richtext":"R&D <3"}}}}"""
         val inputInfo: GraphQlSubredditInfo =
-            Moshi.Builder().build()
-                .adapter(SubredditInfoResponse::class.java)
-                .fromJson(inputJson)!!
-                .data!!.subredditInfoByName
+            requireNotNull(
+                Moshi.Builder().build()
+                    .adapter(SubredditInfoResponse::class.java)
+                    .fromJson(inputJson)!!
+                    .data?.subredditInfoByName,
+            )
         val inputMapper: GraphQlSubredditMapper = GraphQlSubredditMapper()
         val actualData: AboutData = inputMapper.toAboutData(inputInfo)
         assertNull(inputInfo.description!!.html)

@@ -9,12 +9,14 @@ import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlContent
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFlair
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlGallery
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlGalleryItem
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlGalleryMedia
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlMedia
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlMediaSource
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlPostNode
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlStreaming
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlStill
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlSubredditRef
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PostsByIdsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.model.GalleryData
 import com.cosmos.unreddit.data.remote.api.reddit.model.GalleryDataItem
 import com.cosmos.unreddit.data.remote.api.reddit.model.GalleryImage
@@ -25,6 +27,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.model.MediaMetadata
 import com.cosmos.unreddit.data.remote.api.reddit.model.MediaPreview
 import com.cosmos.unreddit.data.remote.api.reddit.model.PostData
 import com.cosmos.unreddit.data.remote.api.reddit.model.RedditVideoPreview
+import com.squareup.moshi.Moshi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -173,6 +176,49 @@ class GraphQlPostMapperTest {
         assertEquals(10, actualMetadataImage.width)
         assertEquals(listOf("https://i.redd.it/first.jpg"), actualGalleryUrls)
         assertTrue(actualGalleryUrls.isNotEmpty())
+    }
+
+    @Test
+    fun `maps gallery metadata from flat media dimensions`() {
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_gallery_flat",
+                postTitle = "A flat gallery",
+                permalink = "/r/Android/comments/gallery_flat/a_flat_gallery/",
+                url = "https://www.reddit.com/gallery/gallery_flat",
+                createdAt = CREATED_AT,
+                gallery =
+                    GraphQlGallery(
+                        items =
+                            listOf(
+                                GraphQlGalleryItem(
+                                    caption = "Flat",
+                                    media =
+                                        GraphQlGalleryMedia(
+                                            id = "media-id",
+                                            url = "https://i.redd.it/flat.jpg",
+                                            width = 10,
+                                            height = 20,
+                                            dimensions = null,
+                                        ),
+                                ),
+                            ),
+                    ),
+            )
+        val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
+        val actualPost: PostData = inputMapper.toPostData(inputNode)
+        val actualGalleryItem: GalleryDataItem =
+            requireNotNull(actualPost.galleryData).items.single()
+        val actualMetadataItem: GalleryItem =
+            requireNotNull(actualPost.mediaMetadata).items.single()
+        val actualMetadataImage: GalleryImage = requireNotNull(actualMetadataItem.image)
+        assertTrue(requireNotNull(actualPost.isRedditGallery))
+        assertEquals("Flat", actualGalleryItem.caption)
+        assertEquals("media-id", actualGalleryItem.mediaId)
+        assertEquals("media-id", actualMetadataItem.id)
+        assertEquals("https://i.redd.it/flat.jpg", actualMetadataImage.url)
+        assertEquals(10, actualMetadataImage.width)
+        assertEquals(20, actualMetadataImage.height)
     }
 
     @Test
@@ -342,6 +388,83 @@ class GraphQlPostMapperTest {
         assertEquals("r/", actualPost.prefixedSubreddit)
         assertEquals("", actualPost.author)
         assertEquals("", actualPost.domain)
+    }
+
+    @Test
+    fun `maps a post node with missing fields to safe defaults`() {
+        val inputNode: GraphQlPostNode = GraphQlPostNode(typename = "DeletedSubredditPost")
+        val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
+        val actualPost: PostData = inputMapper.toPostData(inputNode)
+        assertEquals("", actualPost.name)
+        assertEquals("", actualPost.title)
+        assertEquals("", actualPost.permalink)
+        assertEquals("", actualPost.url)
+        assertEquals(INVALID_EPOCH_SECONDS, actualPost.created)
+    }
+
+    @Test
+    fun `maps nested media and gallery dimensions from JSON`() {
+        val inputJson =
+            """
+            {"data":{"postsInfoByIds":[{
+              "__typename":"SubredditPost",
+              "id":"t3_nested",
+              "postTitle":"Nested media",
+              "permalink":"/r/Android/comments/nested/",
+              "url":"https://www.reddit.com/r/Android/comments/nested/",
+              "createdAt":"2026-10-07T15:47:48.255000+0000",
+              "media":{
+                "still":{"source":{"url":"https://i.redd.it/still.jpg","width":1,"height":2,"dimensions":{"width":1200,"height":800}}},
+                "streaming":{"hlsUrl":"https://v.redd.it/nested/HLSPlaylist.m3u8","dashUrl":"https://v.redd.it/nested/DASHPlaylist.mpd","duration":12,"width":10,"height":20,"dimensions":{"width":640,"height":360}}
+              },
+              "gallery":{
+                "items":[{
+                  "id":"item-id",
+                  "caption":"First",
+                  "url":"https://legacy.example/fallback.jpg",
+                  "width":3,
+                  "height":4,
+                  "media":{
+                    "__typename":"ImageAsset",
+                    "id":"media-id",
+                    "url":"https://i.redd.it/first.jpg",
+                    "width":5,
+                    "height":6,
+                    "dimensions":{"width":100,"height":200}
+                  }
+                }]
+              }
+            }]}}
+            """.trimIndent()
+        val actualResponse =
+            Moshi.Builder()
+                .build()
+                .adapter(PostsByIdsResponse::class.java)
+                .fromJson(inputJson)!!
+        val actualNode: GraphQlPostNode =
+            requireNotNull(requireNotNull(actualResponse.data?.postsInfoByIds).single())
+        val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
+        val actualPost: PostData = inputMapper.toPostData(actualNode)
+        val actualPreview: MediaPreview = requireNotNull(actualPost.mediaPreview)
+        val actualPreviewSource: ImageSource = actualPreview.images.single().imageSource
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        val actualGalleryItem: GalleryDataItem =
+            requireNotNull(actualPost.galleryData).items.single()
+        val actualMetadataItem: GalleryItem =
+            requireNotNull(actualPost.mediaMetadata).items.single()
+        val actualMetadataImage: GalleryImage = requireNotNull(actualMetadataItem.image)
+        assertTrue(requireNotNull(actualPost.isRedditGallery))
+        assertEquals(1200, actualPreviewSource.width)
+        assertEquals(800, actualPreviewSource.height)
+        assertEquals(640, actualVideo.width)
+        assertEquals(360, actualVideo.height)
+        assertEquals("First", actualGalleryItem.caption)
+        assertEquals("media-id", actualGalleryItem.mediaId)
+        assertEquals("media-id", actualMetadataItem.id)
+        assertEquals("https://i.redd.it/first.jpg", actualMetadataImage.url)
+        assertEquals(200, actualMetadataImage.height)
+        assertEquals(100, actualMetadataImage.width)
     }
 
     private companion object {
