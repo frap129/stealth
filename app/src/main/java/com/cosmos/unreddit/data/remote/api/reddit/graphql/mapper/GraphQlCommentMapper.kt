@@ -15,6 +15,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.model.ListingData
 import com.cosmos.unreddit.data.remote.api.reddit.model.MoreChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.MoreChildren
 import com.cosmos.unreddit.data.remote.api.reddit.model.MoreData
+import java.util.Locale
 import javax.inject.Inject
 
 class GraphQlCommentMapper @Inject constructor() {
@@ -171,7 +172,7 @@ class GraphQlCommentMapper @Inject constructor() {
         controversiality = 0,
         flair = comment.authorFlair?.text,
         depth = depth,
-        distinguished = comment.distinguishedAs,
+        distinguished = comment.distinguishedAs?.lowercase(Locale.US),
         subreddit = context.subreddit,
         linkTitle = context.postTitle,
         linkPermalink = context.postPermalink,

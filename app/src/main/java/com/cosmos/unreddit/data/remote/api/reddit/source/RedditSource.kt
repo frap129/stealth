@@ -405,7 +405,14 @@ class RedditSource @Inject constructor(
         val response: PostsByIdsResponse =
             parse(
                 postsByIdsAdapter,
-                client.execute(RedditGraphQlOperations.PostsByIds, mapOf("ids" to ids)),
+                client.execute(
+                    RedditGraphQlOperations.PostsByIds,
+                    buildVariables(
+                        "ids" to ids,
+                        "includeExtendedVideoAsset" to true,
+                        "includePlaybackMp4s" to true,
+                    ),
+                ),
             )
         val data = requireData(response.data, response.errors)
         return requireField(data.postsInfoByIds, response.errors, "Missing posts").mapNotNull { post: GraphQlPostNode? ->

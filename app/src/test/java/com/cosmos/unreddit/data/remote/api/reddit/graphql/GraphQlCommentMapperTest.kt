@@ -1,5 +1,6 @@
 package com.cosmos.unreddit.data.remote.api.reddit.graphql
 
+import com.cosmos.unreddit.data.model.PosterType
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlCommentMapper
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommentForest
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommentPageInfo
@@ -245,7 +246,7 @@ class GraphQlCommentMapperTest {
                 isOP = true,
                 isStickied = true,
                 isScoreHidden = true,
-                distinguishedAs = "moderator",
+                distinguishedAs = "MODERATOR",
                 authorInfo = GraphQlAuthorInfo(name = "author"),
                 authorFlair = GraphQlAuthorFlair(text = "Flair"),
                 content = GraphQlContent(markdown = "markdown body"),
@@ -291,6 +292,10 @@ class GraphQlCommentMapperTest {
         assertEquals("Flair", actualComment.flair)
         assertEquals(0, actualComment.depth)
         assertEquals("moderator", actualComment.distinguished)
+        assertEquals(
+            PosterType.MODERATOR,
+            PosterType.fromDistinguished(actualComment.distinguished),
+        )
         assertEquals(SUBREDDIT, actualComment.subreddit)
         assertEquals(POST_TITLE, actualComment.linkTitle)
         assertEquals(POST_PERMALINK, actualComment.linkPermalink)

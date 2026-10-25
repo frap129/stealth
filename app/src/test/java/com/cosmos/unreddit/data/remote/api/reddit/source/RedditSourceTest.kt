@@ -46,6 +46,8 @@ class RedditSourceTest {
             assertFalse(executor.calls[0].variables.containsKey("after"))
             assertEquals(RedditGraphQlOperations.PostsByIds, executor.calls[1].operation)
             assertEquals(listOf("t3_b", "t3_a"), executor.calls[1].variables["ids"])
+            assertEquals(true, executor.calls[1].variables["includeExtendedVideoAsset"])
+            assertEquals(true, executor.calls[1].variables["includePlaybackMp4s"])
         }
 
     @Test
@@ -179,6 +181,8 @@ class RedditSourceTest {
 
             assertEquals(RedditGraphQlOperations.PostsByIds, executor.calls[0].operation)
             assertEquals(listOf("t3_1wzvqsb"), executor.calls[0].variables["ids"])
+            assertEquals(true, executor.calls[0].variables["includeExtendedVideoAsset"])
+            assertEquals(true, executor.calls[0].variables["includePlaybackMp4s"])
             assertEquals(RedditGraphQlOperations.PostComments, executor.calls[1].operation)
             assertEquals("t3_1wzvqsb", executor.calls[1].variables["id"])
             assertEquals("CONFIDENCE", executor.calls[1].variables["sortType"])

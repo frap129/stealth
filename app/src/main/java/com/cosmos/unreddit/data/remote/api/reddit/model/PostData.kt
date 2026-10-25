@@ -159,10 +159,11 @@ data class PostData(
             domain == "redgifs.com" -> MediaType.REDGIFS
             domain == "streamable.com" -> MediaType.STREAMABLE
             domain == "v.redd.it" -> {
-                if (media?.redditVideoPreview?.isGif == true) {
-                    MediaType.REDDIT_GIF
-                } else {
-                    MediaType.REDDIT_VIDEO
+                val redditVideo: RedditVideoPreview? = media?.redditVideoPreview
+                when {
+                    redditVideo == null || redditVideo.fallbackUrl.isBlank() -> MediaType.LINK
+                    redditVideo.isGif -> MediaType.REDDIT_GIF
+                    else -> MediaType.REDDIT_VIDEO
                 }
             }
 
