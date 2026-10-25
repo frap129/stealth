@@ -6,7 +6,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.model.Child
 import com.cosmos.unreddit.data.remote.api.reddit.model.Listing
 import com.cosmos.unreddit.data.remote.api.reddit.model.MoreChildren
 
-sealed interface BaseRedditSource {
+interface BaseRedditSource {
 
     //region Subreddit
     

@@ -46,6 +46,67 @@ class RedditGraphQlClientTest {
     }
 
     @Test
+    fun `throws RateLimitException when remaining quota is at the floor`() = runTest {
+        val inputServer: MockWebServer = MockWebServer()
+        inputServer.start()
+        try {
+            inputServer.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("x-ratelimit-remaining", "4.0")
+                    .setBody("""{"data":{"ok":true}}"""),
+            )
+            val inputClient: OkHttpClient = OkHttpClient.Builder().build()
+            val inputMoshi: Moshi = Moshi.Builder().build()
+            val inputExecutor: RedditGraphQlClient =
+                RedditGraphQlClient(
+                    client = inputClient,
+                    moshi = inputMoshi,
+                    ioDispatcher = Dispatchers.IO,
+                    endpoint = inputServer.url("/").toString(),
+                )
+            val actualException: RateLimitException =
+                try {
+                    inputExecutor.execute(RedditGraphQlOperations.PostComments, mapOf("id" to "t3_1wzvqsb"))
+                    throw AssertionError("Expected RateLimitException")
+                } catch (exception: RateLimitException) {
+                    exception
+                }
+            assertEquals("GraphQL rate limit near exhaustion", actualException.message)
+        } finally {
+            inputServer.shutdown()
+        }
+    }
+
+    @Test
+    fun `allows responses when remaining quota is above the floor`() = runTest {
+        val inputServer: MockWebServer = MockWebServer()
+        inputServer.start()
+        try {
+            inputServer.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("x-ratelimit-remaining", "4.5")
+                    .setBody("""{"data":{"ok":true}}"""),
+            )
+            val inputClient: OkHttpClient = OkHttpClient.Builder().build()
+            val inputMoshi: Moshi = Moshi.Builder().build()
+            val inputExecutor: RedditGraphQlClient =
+                RedditGraphQlClient(
+                    client = inputClient,
+                    moshi = inputMoshi,
+                    ioDispatcher = Dispatchers.IO,
+                    endpoint = inputServer.url("/").toString(),
+                )
+            val actualBody: String =
+                inputExecutor.execute(RedditGraphQlOperations.PostComments, mapOf("id" to "t3_1wzvqsb"))
+            assertEquals("""{"data":{"ok":true}}""", actualBody)
+        } finally {
+            inputServer.shutdown()
+        }
+    }
+
+    @Test
     fun `throws GraphQlException with code and body on non-2xx`() = runTest {
         val inputServer: MockWebServer = MockWebServer()
         inputServer.start()

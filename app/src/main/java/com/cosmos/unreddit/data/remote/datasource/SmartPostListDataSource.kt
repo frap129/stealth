@@ -5,42 +5,34 @@ import androidx.paging.PagingState
 import com.cosmos.unreddit.data.model.Sort
 import com.cosmos.unreddit.data.model.Sorting
 import com.cosmos.unreddit.data.remote.api.reddit.model.Child
+import com.cosmos.unreddit.data.remote.api.reddit.model.Listing
 import com.cosmos.unreddit.data.remote.api.reddit.model.PostChild
-import com.cosmos.unreddit.data.remote.api.reddit.source.CurrentSource
-import com.cosmos.unreddit.util.RedditUtil
+import com.cosmos.unreddit.data.remote.api.reddit.source.BaseRedditSource
 import com.cosmos.unreddit.util.extension.interlace
 import com.squareup.moshi.JsonDataException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 import java.io.IOException
-import kotlin.math.ceil
 
 class SmartPostListDataSource(
-    private val source: CurrentSource,
+    private val source: BaseRedditSource,
     private val query: List<String>,
     private val sorting: Sorting,
     private val defaultDispatcher: CoroutineDispatcher,
-    mainImmediateDispatcher: CoroutineDispatcher
+    @Suppress("UNUSED_PARAMETER") mainImmediateDispatcher: CoroutineDispatcher
 ) : PagingSource<List<String>, Child>() {
-
-    private val scope = CoroutineScope(mainImmediateDispatcher + SupervisorJob())
-
-    private val joinedQuery by lazy { RedditUtil.joinSubredditList(query) }
-    private val chunkSize by lazy {
-        // Find the optimal chunk size to have lists of similar sizes
-        ceil(query.size / ceil(query.size / REDDIT_SUBREDDIT_LIMIT.toDouble())).toInt()
-    }
 
     override val keyReuseSupported: Boolean = true
 
     override suspend fun load(params: LoadParams<List<String>>): LoadResult<List<String>, Child> {
         return try {
-            if (query.size > REDDIT_SUBREDDIT_LIMIT) getSmartData(params) else getData(params)
+            loadPage(params)
         } catch (exception: IOException) {
             LoadResult.Error(exception)
         } catch (exception: HttpException) {
@@ -56,74 +48,66 @@ class SmartPostListDataSource(
         }
     }
 
-    private suspend fun getSmartData(
+    private suspend fun loadPage(
         params: LoadParams<List<String>>
     ): LoadResult<List<String>, Child> {
-        val queries = withContext(defaultDispatcher) {
-            query
-                // Step 1: Split the subreddit list into chunks
-                .chunked(chunkSize)
-                // Step 2: Create the query string for each chunk
-                .map { RedditUtil.joinSubredditList(it) }
-                // Step 3: Map each chunk with its `after` key (if available)
-                .mapIndexed { index, chunkedList -> chunkedList to params.key?.getOrNull(index) }
+        val key = params.key
+        val activeIndexes = if (key == null) {
+            query.indices.toList()
+        } else {
+            key.indices.filter { key[it].isNotBlank() }
         }
 
-        // Step 4: Request the posts for each chunk in parallel
-        val responses = queries
-            .map {
-                scope.async {
-                    source.getSubreddit(
-                        it.first,
-                        sorting.generalSorting,
-                        sorting.timeSorting,
-                        it.second
-                    )
+        if (activeIndexes.isEmpty()) {
+            return LoadResult.Page(emptyList(), null, null)
+        }
+
+        val semaphore = Semaphore(MAX_CONCURRENT_REQUESTS)
+        val responses: Map<Int, Listing> = coroutineScope {
+            activeIndexes
+                .map { index ->
+                    async(defaultDispatcher) {
+                        index to semaphore.withPermit {
+                            source.getSubreddit(
+                                query[index],
+                                sorting.generalSorting,
+                                sorting.timeSorting,
+                                key?.getOrNull(index)
+                            )
+                        }
+                    }
                 }
-            }
-            .awaitAll()
+                .awaitAll()
+                .toMap()
+        }
 
-        // Step 5: Flatten (and sort) the responses in order to have a single list of posts
         val data = withContext(defaultDispatcher) {
-            responses
-                .map { it.data.children }
+            query.indices
+                .mapNotNull { responses[it]?.data?.children }
                 .sort(sorting)
+                .distinctBy { (it as PostChild).data.name }
         }
 
-        // Step 6: Retrieve the `after` key for each response and create a list out of them
-        val after = withContext(defaultDispatcher) {
-            responses.map { it.data.after ?: "" }
-        }
+        val nextKey = query.indices
+            .map { responses[it]?.data?.after ?: "" }
+            .takeIf { slots -> slots.any { it.isNotBlank() } }
 
-        return LoadResult.Page(data, null, after)
-    }
-
-    private suspend fun getData(params: LoadParams<List<String>>): LoadResult<List<String>, Child> {
-        val response = source.getSubreddit(
-            joinedQuery,
-            sorting.generalSorting,
-            sorting.timeSorting,
-            params.key?.getOrNull(0)
-        )
-
-        val data = response.data
-
-        return LoadResult.Page(data.children, null, data.after?.let { listOf(it) })
+        return LoadResult.Page(data, null, nextKey)
     }
 
     private fun List<List<Child>>.sort(sorting: Sorting): List<Child> {
-        return when(sorting.generalSorting) {
+        return when (sorting.generalSorting) {
             // If sorting is set to NEW, simply flatten the lists and sort the posts by date
-            Sort.NEW -> this.flatten().sortedByDescending { (it as PostChild).data.created }
+            Sort.NEW -> flatten().sortedByDescending { (it as PostChild).data.created }
             // If sorting is set to TOP, simply flatten the lists and sort the posts by score
-            Sort.TOP -> this.flatten().sortedByDescending { (it as PostChild).data.score }
+            Sort.TOP -> flatten().sortedByDescending { (it as PostChild).data.score }
             // For all the other sorting methods, interlace the lists to have a consistent result
             // [['a', 'b', 'c'], ['e', 'f', 'g'], ['h', 'i']] ==> ['a', 'e', 'h', 'b', 'f', 'i', 'c', 'g']
-            else -> this.interlace()
+            else -> interlace()
         }
     }
 
     companion object {
-        private const val REDDIT_SUBREDDIT_LIMIT = 100
+        private const val MAX_CONCURRENT_REQUESTS = 4
     }
 }
