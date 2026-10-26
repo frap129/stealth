@@ -52,6 +52,12 @@ data class GraphQlMedia(
     val streaming: GraphQlStreaming? = null,
     val video: GraphQlStreaming? = null,
     val packagedMedia: GraphQlPackagedMedia? = null,
+    val animated: GraphQlAnimatedMedia? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class GraphQlAnimatedMedia(
+    @Json(name = "mp4_source") val mp4Source: GraphQlMediaSource? = null,
 )
 
 @JsonClass(generateAdapter = true)

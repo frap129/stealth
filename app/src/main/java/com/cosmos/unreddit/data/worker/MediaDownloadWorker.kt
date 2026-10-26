@@ -83,8 +83,15 @@ class MediaDownloadWorker @AssistedInject constructor (
 
         applicationContext.showNotification(NOTIFICATION_ID, builder.build())
 
-        val extension = MimeTypeMap.getFileExtensionFromUrl(url)
-        val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: ""
+        val isAnimatedMp4: Boolean = LinkUtil.isAnimatedRedditMp4(url)
+        val extension: String =
+            if (isAnimatedMp4) MP4_EXTENSION else MimeTypeMap.getFileExtensionFromUrl(url)
+        val mimeType: String =
+            if (isAnimatedMp4) {
+                MP4_MIME_TYPE
+            } else {
+                MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: ""
+            }
         val name = when {
             sound == null -> "${filename}.$extension"
             else -> "${filename}_video.$extension"
@@ -382,6 +389,9 @@ class MediaDownloadWorker @AssistedInject constructor (
         private const val WORK_TAG = "MediaDownloadWorker"
 
         private const val NOTIFICATION_ID = 856
+
+        private const val MP4_EXTENSION = "mp4"
+        private const val MP4_MIME_TYPE = "video/mp4"
 
         private const val KEY_URL = "KEY_URL"
         private const val KEY_TYPE = "KEY_TYPE"

@@ -70,4 +70,22 @@ class LinkUtilTest {
         )
         assertFalse(LinkUtil.isStreamingManifest(""))
     }
+
+    @Test
+    fun `detects animated reddit mp4 urls`() {
+        val inputLink: String =
+            "https://preview.redd.it/5apc9mfquqyd1.gif?width=640&format=mp4&s=abc"
+
+        val actualIsAnimatedMp4: Boolean = LinkUtil.isAnimatedRedditMp4(inputLink)
+
+        assertTrue(actualIsAnimatedMp4)
+    }
+
+    @Test
+    fun `rejects non animated reddit mp4 urls`() {
+        assertFalse(LinkUtil.isAnimatedRedditMp4("https://preview.redd.it/a.gif?format=png8"))
+        assertFalse(LinkUtil.isAnimatedRedditMp4("https://example.com/a.gif?format=mp4"))
+        assertFalse(LinkUtil.isAnimatedRedditMp4("https://preview.redd.it/a.mp4?format=mp4"))
+        assertFalse(LinkUtil.isAnimatedRedditMp4(""))
+    }
 }

@@ -19,6 +19,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.model.MediaMetadata
 import com.cosmos.unreddit.data.remote.api.reddit.model.MediaPreview
 import com.cosmos.unreddit.data.remote.api.reddit.model.PostData
 import com.cosmos.unreddit.data.remote.api.reddit.model.RedditVideoPreview
+import com.cosmos.unreddit.util.LinkUtil
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.util.Locale
 import javax.inject.Inject
@@ -94,21 +95,29 @@ class GraphQlPostMapper @Inject constructor() {
                         .thenBy { it.bitrateBps },
                 )
                 ?.source?.url
+        val animatedSource: GraphQlMediaSource? = animated?.mp4Source
+        val animatedUrl: String? =
+            animatedSource?.url?.takeIf { url: String -> LinkUtil.isAnimatedRedditMp4(url) }
         val fallbackUrl: String =
             packagedUrl
                 ?: streaming?.dashUrl?.takeIf { url: String -> url.isPlayableManifest(".mpd") }
                 ?: streaming?.hlsUrl?.takeIf { url: String -> url.isPlayableManifest(".m3u8") }
                 ?: streaming?.scrubberMediaUrl?.takeIf { url: String -> url.isProgressiveRedditMp4() }
+                ?: animatedUrl
                 ?: return null
         return Media(
             type = "video",
             embed = null,
             redditVideoPreview = RedditVideoPreview(
                 fallbackUrl = fallbackUrl,
-                width = streaming?.resolvedWidth ?: 0,
-                height = streaming?.resolvedHeight ?: 0,
+                width = streaming?.resolvedWidth?.takeIf { width: Int -> width > 0 }
+                    ?: animatedSource?.resolvedWidth
+                    ?: 0,
+                height = streaming?.resolvedHeight?.takeIf { height: Int -> height > 0 }
+                    ?: animatedSource?.resolvedHeight
+                    ?: 0,
                 duration = streaming?.duration ?: 0,
-                isGif = streaming?.isGif ?: false,
+                isGif = streaming?.isGif == true || animatedUrl != null,
             ),
         )
     }

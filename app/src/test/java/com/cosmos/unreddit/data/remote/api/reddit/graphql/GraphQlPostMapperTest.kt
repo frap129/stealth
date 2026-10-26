@@ -6,8 +6,10 @@ import com.cosmos.unreddit.data.model.PosterType
 import com.cosmos.unreddit.data.model.Sort
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlPostMapper
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlAwarding
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlAnimatedMedia
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlAuthorInfo
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlContent
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlDimensions
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFlair
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlGallery
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlGalleryItem
@@ -340,6 +342,191 @@ class GraphQlPostMapperTest {
         assertTrue(actualVideo.isGif)
         assertEquals("https://v.redd.it/gif/CMAF_96.mp4", actualVideo.fallbackUrl)
         assertEquals("https://v.redd.it/gif/CMAF_96.mp4", actualPost.mediaUrl)
+    }
+
+    @Test
+    fun `maps a captured i redd it animated gif to a playable reddit gif`() {
+        val inputJson =
+            """
+            {"data":{"postsInfoByIds":[{
+              "__typename":"SubredditPost",
+              "id":"t3_1giw0we",
+              "postTitle":"A gif",
+              "permalink":"/r/Android/comments/gif/a_gif/",
+              "url":"https://i.redd.it/5apc9mfquqyd1.gif",
+              "domain":"i.redd.it",
+              "createdAt":"$CREATED_AT",
+              "media":{
+                "still":{"source":{"dimensions":{"width":640,"height":400},"url":"https://preview.redd.it/5apc9mfquqyd1.gif?format=png8&s=700b39e539a15a2c4817dad73d7c89513d07f27b"}},
+                "animated":{
+                  "gif_source":{"dimensions":{"width":640,"height":400},"url":"https://preview.redd.it/5apc9mfquqyd1.gif?auto=webp&s=7ccc503778cef711eab7eb64f31060950533e31f"},
+                  "mp4_source":{"dimensions":{"width":640,"height":400},"url":"https://preview.redd.it/5apc9mfquqyd1.gif?width=640&format=mp4&s=ed0f929510cbbc12a3d7edd2be914037900ce959"}
+                }
+              }
+            }]}}
+            """.trimIndent()
+        val actualResponse =
+            Moshi.Builder()
+                .build()
+                .adapter(PostsByIdsResponse::class.java)
+                .fromJson(inputJson)!!
+        val inputNode: GraphQlPostNode =
+            requireNotNull(requireNotNull(actualResponse.data?.postsInfoByIds).single())
+        val actualPost: PostData = GraphQlPostMapper().toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        assertTrue(actualPost.isVideo)
+        assertEquals(MediaType.REDDIT_GIF, actualPost.mediaType)
+        assertTrue(actualVideo.isGif)
+        assertEquals(
+            "https://preview.redd.it/5apc9mfquqyd1.gif?width=640&format=mp4&s=ed0f929510cbbc12a3d7edd2be914037900ce959",
+            actualVideo.fallbackUrl,
+        )
+        assertEquals(actualVideo.fallbackUrl, actualPost.mediaUrl)
+        assertEquals(640, actualVideo.width)
+        assertEquals(400, actualVideo.height)
+    }
+
+    @Test
+    fun `rejects an animated mp4 from a foreign host`() {
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_foreign_gif",
+                postTitle = "A gif",
+                permalink = "/r/Android/comments/gif/a_gif/",
+                url = "https://i.redd.it/foreign.gif",
+                domain = "i.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        animated =
+                            animatedRedditGif("https://example.com/foreign.gif?format=mp4"),
+                    ),
+            )
+        val actualPost: PostData = GraphQlPostMapper().toPostData(inputNode)
+        assertNull(actualPost.media)
+        assertFalse(actualPost.isVideo)
+    }
+
+    @Test
+    fun `rejects an animated mp4 without the mp4 format`() {
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_not_mp4_gif",
+                postTitle = "A gif",
+                permalink = "/r/Android/comments/gif/a_gif/",
+                url = "https://i.redd.it/not_mp4.gif",
+                domain = "i.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        animated =
+                            animatedRedditGif("https://preview.redd.it/not_mp4.gif?format=png8"),
+                    ),
+            )
+        val actualPost: PostData = GraphQlPostMapper().toPostData(inputNode)
+        assertNull(actualPost.media)
+        assertFalse(actualPost.isVideo)
+    }
+
+    @Test
+    fun `prefers the streaming scrubber over an animated mp4`() {
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_streaming_gif",
+                postTitle = "A gif",
+                permalink = "/r/Android/comments/gif/a_gif/",
+                url = "https://v.redd.it/gif",
+                domain = "v.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        streaming =
+                            GraphQlStreaming(
+                                scrubberMediaUrl = "https://v.redd.it/gif/CMAF_96.mp4",
+                                isGif = true,
+                                duration = 4,
+                                width = 320,
+                                height = 180,
+                            ),
+                        animated = animatedRedditGif(ANIMATED_MP4_URL),
+                    ),
+            )
+        val actualPost: PostData = GraphQlPostMapper().toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        assertEquals("https://v.redd.it/gif/CMAF_96.mp4", actualVideo.fallbackUrl)
+    }
+
+    @Test
+    fun `prefers packaged media over an animated mp4`() {
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_packaged_gif",
+                postTitle = "A gif",
+                permalink = "/r/Android/comments/gif/a_gif/",
+                url = "https://v.redd.it/gif",
+                domain = "v.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        packagedMedia =
+                            GraphQlPackagedMedia(
+                                playbackMp4s =
+                                    GraphQlPlaybackMp4s(
+                                        permutations =
+                                            listOf(
+                                                GraphQlPlaybackPermutation(
+                                                    source =
+                                                        GraphQlMediaSource(
+                                                            url =
+                                                                "https://packaged-media.redd.it/gif/pb/m2-res_480p.mp4?m=DASHPlaylist.mpd",
+                                                            width = 480,
+                                                            height = 270,
+                                                        ),
+                                                    bitrateBps = 128000,
+                                                ),
+                                            ),
+                                    ),
+                            ),
+                        animated = animatedRedditGif(ANIMATED_MP4_URL),
+                    ),
+            )
+        val actualPost: PostData = GraphQlPostMapper().toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        assertEquals(
+            "https://packaged-media.redd.it/gif/pb/m2-res_480p.mp4?m=DASHPlaylist.mpd",
+            actualVideo.fallbackUrl,
+        )
+    }
+
+    @Test
+    fun `falls back to animated dimensions when streaming dimensions are zero`() {
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_dimensionless_gif",
+                postTitle = "A gif",
+                permalink = "/r/Android/comments/gif/a_gif/",
+                url = "https://v.redd.it/gif",
+                domain = "v.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        streaming =
+                            GraphQlStreaming(
+                                dashUrl = "https://v.redd.it/gif/DASHPlaylist.mpd",
+                                isGif = true,
+                                duration = 4,
+                            ),
+                        animated = animatedRedditGif(ANIMATED_MP4_URL),
+                    ),
+            )
+        val actualPost: PostData = GraphQlPostMapper().toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        assertEquals(640, actualVideo.width)
+        assertEquals(400, actualVideo.height)
     }
 
     @Test
@@ -725,9 +912,20 @@ class GraphQlPostMapperTest {
         assertTrue(actualPost.isStickied)
     }
 
+    private fun animatedRedditGif(url: String): GraphQlAnimatedMedia =
+        GraphQlAnimatedMedia(
+            mp4Source =
+                GraphQlMediaSource(
+                    url = url,
+                    dimensions = GraphQlDimensions(width = 640, height = 400),
+                ),
+        )
+
     private companion object {
         private const val CREATED_AT: String = "2026-10-07T15:47:48.255000+0000"
         private const val EXPECTED_CREATED_AT_SECONDS: Long = 1791388068L
         private const val INVALID_EPOCH_SECONDS: Long = 0L
+        private const val ANIMATED_MP4_URL: String =
+            "https://preview.redd.it/5apc9mfquqyd1.gif?width=640&format=mp4&s=ed0f929510cbbc12a3d7edd2be914037900ce959"
     }
 }

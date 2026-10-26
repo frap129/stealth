@@ -4,6 +4,7 @@ import android.webkit.MimeTypeMap
 import com.cosmos.unreddit.data.model.MediaType
 import com.cosmos.unreddit.data.remote.api.imgur.model.Image
 import com.cosmos.unreddit.util.extension.extension
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 object LinkUtil {
@@ -27,6 +28,9 @@ object LinkUtil {
     private const val REDDIT_SOUNDTRACK_NAME: String = "_AUDIO_128"
     private const val MANIFEST_MPD_EXTENSION: String = ".mpd"
     private const val MANIFEST_HLS_EXTENSION: String = ".m3u8"
+    private const val REDDIT_PREVIEW_HOST: String = "preview.redd.it"
+    private const val ANIMATED_MP4_FORMAT: String = "mp4"
+    private const val ANIMATED_MP4_PATH_EXTENSION: String = ".gif"
 
     val String.https: String
         get() = this.replace(HTTP_REGEX, "https")
@@ -80,6 +84,13 @@ object LinkUtil {
         val path = link.toHttpUrlOrNull()?.encodedPath ?: return false
         return path.endsWith(MANIFEST_MPD_EXTENSION, ignoreCase = true) ||
             path.endsWith(MANIFEST_HLS_EXTENSION, ignoreCase = true)
+    }
+
+    fun isAnimatedRedditMp4(link: String): Boolean {
+        val url: HttpUrl = link.toHttpUrlOrNull() ?: return false
+        return url.host == REDDIT_PREVIEW_HOST &&
+            url.encodedPath.endsWith(ANIMATED_MP4_PATH_EXTENSION, ignoreCase = true) &&
+            url.queryParameter("format").equals(ANIMATED_MP4_FORMAT, ignoreCase = true)
     }
 
     fun getGfycatId(link: String): String {
