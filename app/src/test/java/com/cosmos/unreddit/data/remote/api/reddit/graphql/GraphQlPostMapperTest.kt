@@ -292,16 +292,13 @@ class GraphQlPostMapperTest {
         assertTrue(actualPost.isVideo)
         assertEquals(MediaType.REDDIT_VIDEO, actualPost.mediaType)
         assertEquals("video", actualMedia.type)
-        assertEquals("https://v.redd.it/x/CMAF_96.mp4", actualVideo.fallbackUrl)
+        assertEquals("https://v.redd.it/x/DASHPlaylist.mpd", actualVideo.fallbackUrl)
         assertEquals(640, actualVideo.width)
         assertEquals(360, actualVideo.height)
         assertEquals(12, actualVideo.duration)
         assertFalse(actualVideo.isGif)
-        assertEquals("https://v.redd.it/x/CMAF_96.mp4", actualPost.mediaUrl)
-        assertEquals(
-            "https://v.redd.it/x/CMAF_AUDIO_128.mp4",
-            LinkUtil.getRedditSoundTrack(actualPost.mediaUrl),
-        )
+        assertEquals("https://v.redd.it/x/DASHPlaylist.mpd", actualPost.mediaUrl)
+        assertNull(LinkUtil.getRedditSoundTrack(actualPost.mediaUrl))
     }
 
     @Test
@@ -397,7 +394,105 @@ class GraphQlPostMapperTest {
     }
 
     @Test
-    fun `maps a reddit video without progressive media to a link`() {
+    fun `prefers highest resolution packaged media mp4 from a wire response`() {
+        val inputJson =
+            """
+            {"data":{"postsInfoByIds":[{
+              "__typename":"SubredditPost",
+              "id":"t3_video",
+              "postTitle":"A video",
+              "permalink":"/r/Android/comments/video/a_video/",
+              "url":"https://v.redd.it/video",
+              "domain":"v.redd.it",
+              "createdAt":"$CREATED_AT",
+              "media":{
+                "streaming":{
+                  "scrubberMediaUrl":"https://v.redd.it/video/CMAF_96.mp4",
+                  "duration":12,
+                  "width":640,
+                  "height":360
+                },
+                "packagedMedia":{
+                  "playbackMp4s":{
+                    "permutations":[
+                      {"source":{"url":"https://packaged-media.redd.it/video/pb/m2-res_220p.mp4?m=DASHPlaylist.mpd","width":220,"height":124}},
+                      {"source":{"url":"https://packaged-media.redd.it/video/pb/m2-res_480p.mp4?m=DASHPlaylist.mpd","width":480,"height":270}}
+                    ]
+                  }
+                }
+              }
+            }]}}
+            """.trimIndent()
+        val actualResponse =
+            Moshi.Builder()
+                .build()
+                .adapter(PostsByIdsResponse::class.java)
+                .fromJson(inputJson)!!
+        val actualNode: GraphQlPostNode =
+            requireNotNull(requireNotNull(actualResponse.data?.postsInfoByIds).single())
+        val actualPost: PostData = GraphQlPostMapper().toPostData(actualNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+
+        assertEquals(MediaType.REDDIT_VIDEO, actualPost.mediaType)
+        assertEquals(
+            "https://packaged-media.redd.it/video/pb/m2-res_480p.mp4?m=DASHPlaylist.mpd",
+            actualVideo.fallbackUrl,
+        )
+        assertNull(LinkUtil.getRedditSoundTrack(actualPost.mediaUrl))
+    }
+
+    @Test
+    fun `maps packaged reddit gif from a wire response`() {
+        val inputJson =
+            """
+            {"data":{"postsInfoByIds":[{
+              "__typename":"SubredditPost",
+              "id":"t3_gif",
+              "postTitle":"A gif",
+              "permalink":"/r/Android/comments/gif/a_gif/",
+              "url":"https://v.redd.it/gif",
+              "domain":"v.redd.it",
+              "createdAt":"$CREATED_AT",
+              "media":{
+                "streaming":{
+                  "scrubberMediaUrl":"https://v.redd.it/gif/CMAF_96.mp4",
+                  "isGif":true,
+                  "duration":4,
+                  "width":320,
+                  "height":180
+                },
+                "packagedMedia":{
+                  "playbackMp4s":{
+                    "permutations":[
+                      {"source":{"url":"https://packaged-media.redd.it/gif/pb/m2-vp9-res_360p.mp4?m=DASHPlaylist.mpd","width":640,"height":360}}
+                    ]
+                  }
+                }
+              }
+            }]}}
+            """.trimIndent()
+        val actualResponse =
+            Moshi.Builder()
+                .build()
+                .adapter(PostsByIdsResponse::class.java)
+                .fromJson(inputJson)!!
+        val actualNode: GraphQlPostNode =
+            requireNotNull(requireNotNull(actualResponse.data?.postsInfoByIds).single())
+        val actualPost: PostData = GraphQlPostMapper().toPostData(actualNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+
+        assertEquals(MediaType.REDDIT_GIF, actualPost.mediaType)
+        assertTrue(actualVideo.isGif)
+        assertEquals(
+            "https://packaged-media.redd.it/gif/pb/m2-vp9-res_360p.mp4?m=DASHPlaylist.mpd",
+            actualPost.mediaUrl,
+        )
+    }
+
+    @Test
+    fun `falls back to dash manifest without packaged media`() {
         val inputNode: GraphQlPostNode =
             GraphQlPostNode(
                 id = "t3_video",
@@ -433,9 +528,13 @@ class GraphQlPostMapperTest {
             )
         val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
         val actualPost: PostData = inputMapper.toPostData(inputNode)
-        assertNull(actualPost.media)
-        assertFalse(actualPost.isVideo)
-        assertEquals(MediaType.LINK, actualPost.mediaType)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+
+        assertTrue(actualPost.isVideo)
+        assertEquals(MediaType.REDDIT_VIDEO, actualPost.mediaType)
+        assertEquals("https://v.redd.it/video/DASHPlaylist.mpd", actualVideo.fallbackUrl)
+        assertNull(LinkUtil.getRedditSoundTrack(actualPost.mediaUrl))
     }
 
     @Test
@@ -598,7 +697,7 @@ class GraphQlPostMapperTest {
         assertTrue(requireNotNull(actualPost.isRedditGallery))
         assertEquals(1200, actualPreviewSource.width)
         assertEquals(800, actualPreviewSource.height)
-        assertEquals("https://v.redd.it/nested/CMAF_96.mp4", actualVideo.fallbackUrl)
+        assertEquals("https://v.redd.it/nested/DASHPlaylist.mpd", actualVideo.fallbackUrl)
         assertEquals(640, actualVideo.width)
         assertEquals(360, actualVideo.height)
         assertEquals("First", actualGalleryItem.caption)

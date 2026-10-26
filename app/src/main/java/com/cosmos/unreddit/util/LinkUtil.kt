@@ -25,6 +25,8 @@ object LinkUtil {
     private val STREAMABLE_LINK = Regex("(.+?)\\.streamable\\.com")
 
     private const val REDDIT_SOUNDTRACK_NAME: String = "_AUDIO_128"
+    private const val MANIFEST_MPD_EXTENSION: String = ".mpd"
+    private const val MANIFEST_HLS_EXTENSION: String = ".m3u8"
 
     val String.https: String
         get() = this.replace(HTTP_REGEX, "https")
@@ -54,16 +56,30 @@ object LinkUtil {
         return link.replace(GIF_REGEX, "mp4")
     }
 
-    fun getRedditSoundTrack(link: String): String {
-        val match = REDDIT_VIDEO_REGEX.find(link)
-            ?: error("Invalid reddit video URL: $link")
+    /**
+     * Returns the separate audio track for legacy DASH/CMAF Reddit videos.
+     * Packaged-media MP4s contain embedded audio, so null means no extra track is needed.
+     */
+    fun getRedditSoundTrack(link: String): String? {
+        val url = link.toHttpUrlOrNull() ?: return null
+        val match = REDDIT_VIDEO_REGEX.find(url.encodedPath) ?: return null
 
         val format = match.groupValues[1]
-        return link.replace(REDDIT_VIDEO_REGEX, "$format$REDDIT_SOUNDTRACK_NAME")
+        val audioPath = url.encodedPath.replace(
+            REDDIT_VIDEO_REGEX,
+            "$format$REDDIT_SOUNDTRACK_NAME",
+        )
+        return url.newBuilder().encodedPath(audioPath).build().toString()
     }
 
     fun isRedditSoundTrack(link: String): Boolean {
         return link.contains(REDDIT_SOUNDTRACK_NAME)
+    }
+
+    fun isStreamingManifest(link: String): Boolean {
+        val path = link.toHttpUrlOrNull()?.encodedPath ?: return false
+        return path.endsWith(MANIFEST_MPD_EXTENSION, ignoreCase = true) ||
+            path.endsWith(MANIFEST_HLS_EXTENSION, ignoreCase = true)
     }
 
     fun getGfycatId(link: String): String {

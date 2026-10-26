@@ -32,6 +32,7 @@ import com.cosmos.unreddit.data.receiver.DownloadManagerReceiver
 import com.cosmos.unreddit.di.DispatchersModule.IoDispatcher
 import com.cosmos.unreddit.util.DateUtil
 import com.cosmos.unreddit.util.IntentUtil
+import com.cosmos.unreddit.util.LinkUtil
 import com.cosmos.unreddit.util.extension.cancelAllWorkByTag
 import com.cosmos.unreddit.util.extension.cancelNotification
 import com.cosmos.unreddit.util.extension.createNotificationChannel
@@ -69,6 +70,7 @@ class MediaDownloadWorker @AssistedInject constructor (
 
     override suspend fun doWork(): Result {
         val url = inputData.getString(KEY_URL) ?: return Result.failure()
+        if (LinkUtil.isStreamingManifest(url)) return Result.failure()
         val type = inputData.getInt(KEY_TYPE, -1).let {
             GalleryMedia.Type.fromValue(it)
         } ?: return Result.failure()

@@ -29,6 +29,7 @@ import com.cosmos.unreddit.data.model.Resource
 import com.cosmos.unreddit.data.worker.MediaDownloadWorker
 import com.cosmos.unreddit.databinding.FragmentMediaViewerBinding
 import com.cosmos.unreddit.ui.common.FullscreenBottomSheetFragment
+import com.cosmos.unreddit.util.LinkUtil
 import com.cosmos.unreddit.util.extension.betterSmoothScrollToPosition
 import com.cosmos.unreddit.util.extension.clearWindowInsetsListener
 import com.cosmos.unreddit.util.extension.getRecyclerView
@@ -304,18 +305,26 @@ class MediaViewerFragment : FullscreenBottomSheetFragment() {
 
         val media = mediaAdapter.getItem(page)
         media?.let {
-            MediaDownloadWorker.enqueueWork(
-                requireContext().applicationContext,
-                it.url,
-                it.type,
-                it.sound
-            )
+            if (LinkUtil.isStreamingManifest(it.url)) {
+                Toast.makeText(
+                    requireContext(),
+                    R.string.toast_download_unavailable_streaming,
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                MediaDownloadWorker.enqueueWork(
+                    requireContext().applicationContext,
+                    it.url,
+                    it.type,
+                    it.sound
+                )
 
-            Toast.makeText(
-                requireContext(),
-                R.string.toast_download_started,
-                Toast.LENGTH_SHORT
-            ).show()
+                Toast.makeText(
+                    requireContext(),
+                    R.string.toast_download_started,
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 

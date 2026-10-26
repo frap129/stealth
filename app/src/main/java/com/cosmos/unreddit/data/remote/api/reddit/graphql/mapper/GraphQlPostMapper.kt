@@ -19,6 +19,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.model.MediaMetadata
 import com.cosmos.unreddit.data.remote.api.reddit.model.MediaPreview
 import com.cosmos.unreddit.data.remote.api.reddit.model.PostData
 import com.cosmos.unreddit.data.remote.api.reddit.model.RedditVideoPreview
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.util.Locale
 import javax.inject.Inject
 
@@ -81,13 +82,22 @@ class GraphQlPostMapper @Inject constructor() {
     }
 
     private fun GraphQlMedia.toMedia(): Media? {
-        val streaming: GraphQlStreaming? = streaming
+        val streaming: GraphQlStreaming? = streaming ?: video
         val packagedUrl: String? =
             packagedMedia?.playbackMp4s?.permutations
-                ?.mapNotNull { permutation: GraphQlPlaybackPermutation -> permutation.source?.url }
-                ?.firstOrNull { url: String -> url.isProgressiveRedditMp4() }
+                .orEmpty()
+                .filter { permutation: GraphQlPlaybackPermutation ->
+                    permutation.source?.url?.isProgressiveRedditMp4() == true
+                }
+                .maxWithOrNull(
+                    compareBy<GraphQlPlaybackPermutation> { it.resolutionArea() }
+                        .thenBy { it.bitrateBps },
+                )
+                ?.source?.url
         val fallbackUrl: String =
             packagedUrl
+                ?: streaming?.dashUrl?.takeIf { url: String -> url.isPlayableManifest(".mpd") }
+                ?: streaming?.hlsUrl?.takeIf { url: String -> url.isPlayableManifest(".m3u8") }
                 ?: streaming?.scrubberMediaUrl?.takeIf { url: String -> url.isProgressiveRedditMp4() }
                 ?: return null
         return Media(
@@ -103,8 +113,24 @@ class GraphQlPostMapper @Inject constructor() {
         )
     }
 
-    private fun String.isProgressiveRedditMp4(): Boolean =
-        isNotBlank() && REDDIT_VIDEO_MP4_REGEX.containsMatchIn(this)
+    private fun GraphQlPlaybackPermutation.resolutionArea(): Int {
+        val mediaSource: GraphQlMediaSource = source ?: return 0
+        val width: Int = mediaSource.dimensions?.width ?: mediaSource.width
+        val height: Int = mediaSource.dimensions?.height ?: mediaSource.height
+        return width * height
+    }
+
+    private fun String.isProgressiveRedditMp4(): Boolean {
+        val url = toHttpUrlOrNull() ?: return false
+        return url.host in REDDIT_VIDEO_HOSTS &&
+            url.encodedPath.endsWith(".mp4", ignoreCase = true)
+    }
+
+    private fun String.isPlayableManifest(extension: String): Boolean {
+        val url = toHttpUrlOrNull() ?: return false
+        return url.host in REDDIT_VIDEO_HOSTS &&
+            url.encodedPath.endsWith(extension, ignoreCase = true)
+    }
 
     private fun GraphQlGallery.toGalleryData(): GalleryData =
         GalleryData(
@@ -174,6 +200,7 @@ class GraphQlPostMapper @Inject constructor() {
     )
 
     private companion object {
-        private val REDDIT_VIDEO_MP4_REGEX: Regex = Regex("(DASH|CMAF)_\\d+")
+        private val REDDIT_VIDEO_HOSTS: Set<String> =
+            setOf("v.redd.it", "packaged-media.redd.it")
     }
 }
