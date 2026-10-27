@@ -43,6 +43,23 @@ class GraphQlModelsTest {
     }
 
     @Test
+    fun `parses richtext media in post content`() {
+        val inputJson =
+            """{"data":{"postsInfoByIds":[{"__typename":"SubredditPost","id":"t3_1","content":{"html":"Body","markdown":"Body\n\n![img](abc)","richtext":"{\"document\":[{\"e\":\"par\",\"c\":[{\"e\":\"text\",\"t\":\"Body\"}]},{\"e\":\"img\",\"id\":\"abc\"}]}","richtextMedia":[{"__typename":"ImageAsset","id":"abc","url":"https://i.redd.it/abc.png","mimetype":"image/png","status":"VALID","width":100,"height":50}]}}]}}"""
+        val actualResponse =
+            Moshi.Builder().build().adapter(PostsByIdsResponse::class.java).fromJson(inputJson)!!
+        val actualContent =
+            requireNotNull(
+                requireNotNull(actualResponse.data?.postsInfoByIds).single()?.content,
+            )
+        val actualMedia = actualContent.richtextMedia.single()
+        assertEquals("ImageAsset", actualMedia.typename)
+        assertEquals("abc", actualMedia.id)
+        assertEquals("https://i.redd.it/abc.png", actualMedia.url)
+        assertEquals("image/png", actualMedia.mimetype)
+    }
+
+    @Test
     fun `parses a deleted comment node without an id`() {
         val inputJson =
             """{"data":{"postInfoById":{"id":"t3_1","title":"t","commentCount":1,"commentForest":{"pageInfo":{"hasNextPage":false},"trees":[{"depth":2,"parentId":"t1_a","childCount":2,"more":null,"node":{"__typename":"DeletedComment","createdAt":"2026-10-23T12:48:55.300000+0000","isInitiallyCollapsed":true,"moderationInfo":null,"removedByCategory":"DELETED"}}]}}}}"""

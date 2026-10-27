@@ -45,7 +45,7 @@ class GraphQlPostMapper @Inject constructor() {
             isSelf = node.isSelfPost,
             crossposts = null,
             domain = node.domain.orEmpty(),
-            selfTextHtml = node.content?.html,
+            selfTextHtml = RichTextHtmlConverter.toHtml(node.content),
             suggestedSort = node.suggestedCommentSort?.lowercase(Locale.US),
             isArchived = node.isArchived,
             isOver18 = node.isNsfw,

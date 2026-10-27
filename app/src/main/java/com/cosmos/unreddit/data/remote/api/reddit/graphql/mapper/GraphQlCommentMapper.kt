@@ -160,7 +160,7 @@ class GraphQlCommentMapper @Inject constructor() {
         author = comment.authorInfo?.name.orEmpty(),
         score = comment.score,
         awardings = emptyList(),
-        bodyHtml = comment.content?.html ?: comment.content?.markdown.orEmpty(),
+        bodyHtml = RichTextHtmlConverter.toHtml(comment.content).orEmpty(),
         edited = comment.editedAt?.let { GraphQlTimestamp.toEpochSeconds(it) } ?: NOT_EDITED,
         isSubmitter = comment.isOP,
         stickied = comment.isStickied,

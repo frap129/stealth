@@ -87,8 +87,27 @@ data class GraphQlContent(
     val markdown: String? = null,
     val preview: String? = null,
     val richtext: String? = null,
+    val richtextMedia: List<GraphQlRichTextMedia> = emptyList(),
     val typeHint: String? = null,
 )
+
+@JsonClass(generateAdapter = true)
+data class GraphQlRichTextMedia(
+    @Json(name = "__typename") val typename: String? = null,
+    val id: String? = null,
+    val url: String? = null,
+    val mp4Url: String? = null,
+    val duration: Int = 0,
+    val width: Int = 0,
+    val height: Int = 0,
+    val mimetype: String? = null,
+    val status: String? = null,
+    val still: GraphQlRichTextStill? = null,
+    val packagedMedia: GraphQlPackagedMedia? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class GraphQlRichTextStill(val content: GraphQlMediaSource? = null)
 
 @JsonClass(generateAdapter = true)
 data class GraphQlAwarding(val total: Int = 0)
