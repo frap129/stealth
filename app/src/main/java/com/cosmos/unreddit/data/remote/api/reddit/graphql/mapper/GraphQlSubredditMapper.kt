@@ -3,7 +3,6 @@ package com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlContent
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlSubredditInfo
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlSubredditStyles
-import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlTargetableCommunity
 import com.cosmos.unreddit.data.remote.api.reddit.model.AboutData
 import javax.inject.Inject
 
@@ -35,30 +34,6 @@ class GraphQlSubredditMapper @Inject constructor() {
             descriptionHtml = info.description.toDescriptionHtml(),
             url = "https://www.reddit.com${info.path.orEmpty()}",
             created = GraphQlTimestamp.toEpochSeconds(info.createdAt.orEmpty()),
-        )
-    }
-
-    fun toAboutData(community: GraphQlTargetableCommunity): AboutData {
-        val name: String = community.subredditInfo?.name.orEmpty()
-        return AboutData(
-            wikiEnabled = false,
-            displayName = name,
-            headerImg = null,
-            title = name,
-            primaryColor = null,
-            activeUserCount = null,
-            iconImg = community.iconUrl,
-            subscribers = community.subscriberCount,
-            quarantine = false,
-            publicDescriptionHtml = community.description.escapeHtml(),
-            communityIcon = community.iconUrl.orEmpty(),
-            bannerBackgroundImage = "",
-            keyColor = null,
-            bannerBackgroundColor = null,
-            over18 = false,
-            descriptionHtml = null,
-            url = if (name.isEmpty()) "" else "https://www.reddit.com/r/$name",
-            created = 0L,
         )
     }
 

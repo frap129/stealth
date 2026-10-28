@@ -5,9 +5,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlCommunity
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlContent
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlPersonIcon
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlSubredditInfo
-import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlSubredditRef
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlSubredditStyles
-import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlTargetableCommunity
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlWiki
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlWikiPage
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SubredditInfoResponse
@@ -126,15 +124,6 @@ class GraphQlSubredditMapperTest {
     }
 
     @Test
-    fun `escapes community description text`() {
-        val inputCommunity: GraphQlTargetableCommunity =
-            GraphQlTargetableCommunity(description = "R&D <3")
-        val inputMapper: GraphQlSubredditMapper = GraphQlSubredditMapper()
-        val actualData: AboutData = inputMapper.toAboutData(inputCommunity)
-        assertEquals("R&amp;D &lt;3", actualData.publicDescriptionHtml)
-    }
-
-    @Test
     fun `falls back to legacy banner and icon styles`() {
         val inputInfo: GraphQlSubredditInfo =
             minimalInfo(
@@ -232,70 +221,6 @@ class GraphQlSubredditMapperTest {
         assertNull(actualData.descriptionHtml)
         assertEquals("https://www.reddit.com/r/Android/", actualData.url)
         assertEquals(EXPECTED_CREATED_AT_SECONDS, actualData.created)
-    }
-
-    @Test
-    fun `maps a community search result to about data`() {
-        val inputCommunity: GraphQlTargetableCommunity =
-            GraphQlTargetableCommunity(
-                subredditInfo = GraphQlSubredditRef(name = "Android", prefixedName = null),
-                iconUrl = "https://example.com/community-icon.png",
-                description = "Community description",
-                subscriberCount = 1_000,
-            )
-        val inputMapper: GraphQlSubredditMapper = GraphQlSubredditMapper()
-        val actualData: AboutData = inputMapper.toAboutData(inputCommunity)
-        assertEquals(false, actualData.wikiEnabled)
-        assertEquals("Android", actualData.displayName)
-        assertNull(actualData.headerImg)
-        assertEquals("Android", actualData.title)
-        assertNull(actualData.primaryColor)
-        assertNull(actualData.activeUserCount)
-        assertEquals("https://example.com/community-icon.png", actualData.iconImg)
-        assertEquals(1_000, actualData.subscribers)
-        assertEquals(false, actualData.quarantine)
-        assertEquals("Community description", actualData.publicDescriptionHtml)
-        assertEquals("https://example.com/community-icon.png", actualData.communityIcon)
-        assertEquals("", actualData.bannerBackgroundImage)
-        assertNull(actualData.keyColor)
-        assertNull(actualData.bannerBackgroundColor)
-        assertEquals(false, actualData.over18)
-        assertNull(actualData.descriptionHtml)
-        assertEquals("https://www.reddit.com/r/Android", actualData.url)
-        assertEquals(0L, actualData.created)
-    }
-
-    @Test
-    fun `maps a community search result with a missing name to defaults`() {
-        val inputCommunity: GraphQlTargetableCommunity =
-            GraphQlTargetableCommunity(
-                subredditInfo = GraphQlSubredditRef(name = null, prefixedName = null),
-                iconUrl = "https://example.com/community-icon.png",
-                description = "Community description",
-                subscriberCount = 1_000,
-            )
-        val inputMapper: GraphQlSubredditMapper = GraphQlSubredditMapper()
-        val actualData: AboutData = inputMapper.toAboutData(inputCommunity)
-        assertEquals("", actualData.displayName)
-        assertEquals("", actualData.title)
-        assertEquals("", actualData.url)
-        assertEquals("https://example.com/community-icon.png", actualData.iconImg)
-        assertEquals(1_000, actualData.subscribers)
-        assertEquals("Community description", actualData.publicDescriptionHtml)
-    }
-
-    @Test
-    fun `maps a community search result without a subreddit ref to defaults`() {
-        val inputCommunity: GraphQlTargetableCommunity = GraphQlTargetableCommunity()
-        val inputMapper: GraphQlSubredditMapper = GraphQlSubredditMapper()
-        val actualData: AboutData = inputMapper.toAboutData(inputCommunity)
-        assertEquals("", actualData.displayName)
-        assertEquals("", actualData.title)
-        assertNull(actualData.iconImg)
-        assertNull(actualData.subscribers)
-        assertNull(actualData.publicDescriptionHtml)
-        assertEquals("", actualData.communityIcon)
-        assertEquals("", actualData.url)
     }
 
     @Test

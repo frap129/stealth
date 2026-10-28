@@ -19,7 +19,5 @@ object RedditGraphQlOperations {
     val SubmittedPostsFeedSdui = GraphQlOperation("SubmittedPostsFeedSdui", "8bcd9296341ba003625abe814251e57437c42f0272d88b166c499f8bebc4cadb")
     val SubmittedComments = GraphQlOperation("SubmittedComments", "e1b37f521fb40af2120946b70e7fbf6a3d924db2abaf28ff2164d4cfacca28db")
     val LiveCommentsByIds = GraphQlOperation("LiveCommentsByIds", "51ab9f2e0eb87b6dac9aac02012ba7046049e516ec55ec442abfed0f19c6f311")
-    val SearchPosts = GraphQlOperation("SearchPosts", "08c50e2f9868ea1b8c4411cca57cd58353c729b4fa714cef66448600f76b0922")
     val SearchPeople = GraphQlOperation("SearchPeople", "db3607c1a7deea8441614a053c5f434f60da0c8c931db952f819a59d534d9743")
-    val CommunitySearch = GraphQlOperation("CommunitySearch", "ea096984f5a2caf0122cca8f06039c71a0c8ecc99516a7e3782f71b249572133")
 }

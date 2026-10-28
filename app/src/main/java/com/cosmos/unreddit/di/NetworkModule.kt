@@ -5,6 +5,7 @@ import com.cosmos.unreddit.data.remote.api.gfycat.GfycatApi
 import com.cosmos.unreddit.data.remote.api.imgur.ImgurApi
 import com.cosmos.unreddit.data.remote.api.imgur.adapter.AlbumDataAdapter
 import com.cosmos.unreddit.data.remote.api.reddit.RedditAuthInterceptor
+import com.cosmos.unreddit.data.remote.api.reddit.RedditSearchApi
 import com.cosmos.unreddit.data.remote.api.reddit.adapter.EditedAdapter
 import com.cosmos.unreddit.data.remote.api.reddit.adapter.MediaMetadataAdapter
 import com.cosmos.unreddit.data.remote.api.reddit.adapter.NullToEmptyStringAdapter
@@ -130,6 +131,20 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideGraphQlExecutor(client: RedditGraphQlClient): GraphQlExecutor = client
+
+    @Provides
+    @Singleton
+    fun provideRedditSearchApi(
+        @RedditMoshi moshi: Moshi,
+        @RedditGqlOkHttp okHttpClient: OkHttpClient,
+    ): RedditSearchApi =
+        Retrofit
+            .Builder()
+            .baseUrl(RedditSearchApi.BASE_URL)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .client(okHttpClient)
+            .build()
+            .create(RedditSearchApi::class.java)
 
     @Provides
     @Singleton

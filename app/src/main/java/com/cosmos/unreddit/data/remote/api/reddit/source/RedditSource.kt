@@ -2,13 +2,13 @@ package com.cosmos.unreddit.data.remote.api.reddit.source
 
 import com.cosmos.unreddit.data.model.Sort
 import com.cosmos.unreddit.data.model.TimeSorting
+import com.cosmos.unreddit.data.remote.api.reddit.RedditSearchApi
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.GraphQlExecutor
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.RedditGraphQlOperations
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlCommentMapper
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlPostMapper
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlSubredditMapper
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlUserMapper
-import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommunitySearchResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlComment
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlError
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFeedElements
@@ -23,7 +23,6 @@ import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PopularFeedRespo
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PostCommentsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PostsByIdsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SearchPeopleResponse
-import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SearchPostsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SubmittedCommentsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SubmittedPostsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SubredditFeedResponse
@@ -48,12 +47,14 @@ import com.squareup.moshi.Moshi
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class RedditSource @Inject constructor(
     private val client: GraphQlExecutor,
+    private val searchApi: RedditSearchApi,
     @RedditMoshi moshi: Moshi,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : BaseRedditSource {
@@ -73,12 +74,8 @@ class RedditSource @Inject constructor(
         moshi.adapter(PostsByIdsResponse::class.java)
     private val subredditInfoAdapter: JsonAdapter<SubredditInfoResponse> =
         moshi.adapter(SubredditInfoResponse::class.java)
-    private val searchPostsAdapter: JsonAdapter<SearchPostsResponse> =
-        moshi.adapter(SearchPostsResponse::class.java)
     private val searchPeopleAdapter: JsonAdapter<SearchPeopleResponse> =
         moshi.adapter(SearchPeopleResponse::class.java)
-    private val communitySearchAdapter: JsonAdapter<CommunitySearchResponse> =
-        moshi.adapter(CommunitySearchResponse::class.java)
     private val postCommentsAdapter: JsonAdapter<PostCommentsResponse> =
         moshi.adapter(PostCommentsResponse::class.java)
     private val liveCommentsAdapter: JsonAdapter<LiveCommentsByIdsResponse> =
@@ -139,14 +136,7 @@ class RedditSource @Inject constructor(
         timeSorting: TimeSorting?,
         after: String?,
     ): Listing = withContext(ioDispatcher) {
-        searchPostsListing(
-            buildVariables(
-                "query" to "$query subreddit:$subreddit",
-                "productSurface" to SEARCH_PRODUCT_SURFACE,
-                "sort" to sort.toSearchSort(),
-                "afterCursor" to after,
-            ),
-        )
+        searchApi.searchInSubreddit(subreddit, query, sort.toRestSearchSort(), timeSorting?.type, after)
     }
 
     override suspend fun getPost(
@@ -327,14 +317,7 @@ class RedditSource @Inject constructor(
         timeSorting: TimeSorting?,
         after: String?,
     ): Listing = withContext(ioDispatcher) {
-        searchPostsListing(
-            buildVariables(
-                "query" to query,
-                "productSurface" to SEARCH_PRODUCT_SURFACE,
-                "sort" to sort.toSearchSort(),
-                "afterCursor" to after,
-            ),
-        )
+        searchApi.searchPost(query, sort.toRestSearchSort(), timeSorting?.type, after)
     }
 
     override suspend fun searchUser(
@@ -362,27 +345,13 @@ class RedditSource @Inject constructor(
         )
     }
 
-    /**
-     * CommunitySearch exposes no cursor and returns a single page of communities.
-     */
     override suspend fun searchSubreddit(
         query: String,
         sort: Sort?,
         timeSorting: TimeSorting?,
         after: String?,
     ): Listing = withContext(ioDispatcher) {
-        val response: CommunitySearchResponse =
-            parse(
-                communitySearchAdapter,
-                client.execute(RedditGraphQlOperations.CommunitySearch, mapOf("query" to query)),
-            )
-        val data = requireData(response.data, response.errors)
-        val communities = requireField(
-            data.targetableCommunityInfo,
-            response.errors,
-            "Missing targetable communities",
-        )
-        listing(communities.map { AboutChild(subredditMapper.toAboutData(it)) })
+        searchApi.searchSubreddit(query, sort.toRestSearchSort(), timeSorting?.type, after)
     }
 
     private suspend fun postsListing(
@@ -450,21 +419,6 @@ class RedditSource @Inject constructor(
         return requireField(data.postsInfoByIds, response.errors, "Missing posts").mapNotNull { post: GraphQlPostNode? ->
             post?.takeIf { it.isRenderablePost() }
         }
-    }
-
-    private suspend fun searchPostsListing(variables: Map<String, Any?>): Listing {
-        val response: SearchPostsResponse =
-            parse(searchPostsAdapter, client.execute(RedditGraphQlOperations.SearchPosts, variables))
-        val data = requireData(response.data, response.errors)
-        val search = requireField(data.search, response.errors, "Missing search")
-        val general = requireField(search.general, response.errors, "Missing general search")
-        val posts = requireField(general.posts, response.errors, "Missing search posts")
-        val children: List<Child> =
-            posts.edges
-                .mapNotNull { it.node }
-                .filter { it.isRenderablePost() }
-                .map { PostChild(postMapper.toPostData(it)) }
-        return listing(children, posts.pageInfo.nextPageCursorOrNull())
     }
 
     private fun listing(children: List<Child>, cursor: String? = null): Listing =
@@ -614,6 +568,8 @@ class RedditSource @Inject constructor(
             Sort.COMMENTS -> "COMMENTS"
             else -> null
         }
+
+    private fun Sort?.toRestSearchSort(): String? = toSearchSort()?.lowercase(Locale.US)
 
     private fun TimeSorting.toFeedRange(): String =
         when (this) {

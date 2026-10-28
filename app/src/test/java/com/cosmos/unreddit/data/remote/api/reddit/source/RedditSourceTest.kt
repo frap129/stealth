@@ -2,6 +2,7 @@ package com.cosmos.unreddit.data.remote.api.reddit.source
 
 import com.cosmos.unreddit.data.model.Sort
 import com.cosmos.unreddit.data.model.TimeSorting
+import com.cosmos.unreddit.data.remote.api.reddit.RedditSearchApi
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.GraphQlExecutor
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.GraphQlOperation
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.RedditGraphQlOperations
@@ -9,6 +10,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.model.AboutChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.AboutUserChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.CommentChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.Listing
+import com.cosmos.unreddit.data.remote.api.reddit.model.ListingData
 import com.cosmos.unreddit.data.remote.api.reddit.model.MoreChild
 import com.cosmos.unreddit.data.remote.api.reddit.model.PostChild
 import com.squareup.moshi.Moshi
@@ -17,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -25,6 +28,7 @@ import java.io.IOException
 class RedditSourceTest {
     private val moshi: Moshi = Moshi.Builder().build()
     private lateinit var executor: FakeGraphQlExecutor
+    private lateinit var mockSearchApi: FakeRedditSearchApi
 
     @Test
     fun `getSubreddit sends feed ids to posts by ids in feed order`() =
@@ -488,25 +492,6 @@ class RedditSourceTest {
         }
 
     @Test
-    fun `searchSubreddit sends community search and returns about children`() =
-        runTest {
-            val source =
-                createSource(
-                    """{"data":{"targetableCommunityInfo":[{"subredditInfo":{"name":"Android"},"iconUrl":"https://example.com/icon.png","description":"desc","subscriberCount":1000}]}}""",
-                )
-
-            val actualListing =
-                source.searchSubreddit("android", Sort.RELEVANCE, TimeSorting.ALL, "cursor")
-
-            val actualChild = actualListing.data.children.single() as AboutChild
-            assertEquals("Android", actualChild.data.displayName)
-            assertEquals(1000, actualChild.data.subscribers)
-            assertEquals(RedditGraphQlOperations.CommunitySearch, executor.calls.single().operation)
-            assertEquals("android", executor.calls.single().variables["query"])
-            assertNull(actualListing.data.after)
-        }
-
-    @Test
     fun `getUserComments hydrates submitted comments with their post context`() =
         runTest {
             val source =
@@ -652,59 +637,47 @@ class RedditSourceTest {
         }
 
     @Test
-    fun `searchInSubreddit scopes the query and maps search posts`() =
+    fun `searchPost uses rest search`() =
         runTest {
-            val source = createSource(searchPostsJson(listOf("t3_a"), "t3_cursor", true))
+            val source: RedditSource = createSource()
 
-            val actualListing =
-                source.searchInSubreddit("Android", "pixel", Sort.NEW, TimeSorting.WEEK, "after")
+            val actualListing: Listing =
+                source.searchPost("pixel", Sort.TOP, TimeSorting.WEEK, "after")
 
-            assertEquals("t3_a", (actualListing.data.children.single() as PostChild).data.name)
-            assertEquals("t3_cursor", actualListing.data.after)
-            assertEquals(RedditGraphQlOperations.SearchPosts, executor.calls.single().operation)
-            assertEquals("pixel subreddit:Android", executor.calls.single().variables["query"])
-            assertEquals("SEARCH", executor.calls.single().variables["productSurface"])
-            assertEquals("NEW", executor.calls.single().variables["sort"])
-            assertEquals("after", executor.calls.single().variables["afterCursor"])
-            assertFalse(executor.calls.single().variables.containsKey("time"))
+            assertSame(mockSearchApi.response, actualListing)
+            assertEquals(
+                SearchCall("searchPost", null, "pixel", "top", "week", "after"),
+                mockSearchApi.calls.single(),
+            )
+            assertTrue(executor.calls.isEmpty())
         }
 
     @Test
-    fun `searchPost omits a null sort and cursor`() =
+    fun `searchInSubreddit uses rest subreddit search`() =
         runTest {
-            val source = createSource(searchPostsJson(listOf("t3_a"), null, false))
+            val source: RedditSource = createSource()
 
-            val actualListing = source.searchPost("pixel", null, TimeSorting.WEEK, null)
+            source.searchInSubreddit("Android", "pixel", Sort.NEW, null, null)
 
-            assertEquals(1, actualListing.data.children.size)
-            assertNull(actualListing.data.after)
-            assertEquals(RedditGraphQlOperations.SearchPosts, executor.calls.single().operation)
-            assertEquals("pixel", executor.calls.single().variables["query"])
-            assertEquals("SEARCH", executor.calls.single().variables["productSurface"])
-            assertFalse(executor.calls.single().variables.containsKey("sort"))
-            assertFalse(executor.calls.single().variables.containsKey("afterCursor"))
+            assertEquals(
+                SearchCall("searchInSubreddit", "Android", "pixel", "new", null, null),
+                mockSearchApi.calls.single(),
+            )
+            assertTrue(executor.calls.isEmpty())
         }
 
     @Test
-    fun `searchPost skips deleted and unavailable post nodes`() =
+    fun `searchSubreddit uses rest subreddit search`() =
         runTest {
-            val source: RedditSource =
-                createSource(
-                    searchPostsRawJson(
-                        edges =
-                            """
-                            {"node":{"__typename":"DeletedSubredditPost","id":"t3_deleted"}},
-                            {"node":${postJson("t3_valid", "Valid")}},
-                            {"node":{"__typename":"UnavailablePost","id":"t3_unavailable"}}
-                            """.trimIndent(),
-                    ),
-                )
+            val source: RedditSource = createSource()
 
-            val actualListing = source.searchPost("query", null, null, null)
+            source.searchSubreddit("android", Sort.BEST, null, "cursor")
 
-            assertEquals(1, actualListing.data.children.size)
-            val actualPost: PostChild = actualListing.data.children.single() as PostChild
-            assertEquals("t3_valid", actualPost.data.name)
+            assertEquals(
+                SearchCall("searchSubreddit", null, "android", null, null, "cursor"),
+                mockSearchApi.calls.single(),
+            )
+            assertTrue(executor.calls.isEmpty())
         }
 
     @Test
@@ -792,26 +765,10 @@ class RedditSourceTest {
             val source = createSource("""{"data":null}""")
 
             try {
-                source.searchSubreddit("missing", null, null, null)
+                source.searchUser("missing", null, null, null)
                 fail("Expected IOException")
             } catch (exception: IOException) {
                 assertEquals("Empty GraphQL response", exception.message)
-            }
-        }
-
-    @Test
-    fun `searchSubreddit surfaces errors when communities are null`() =
-        runTest {
-            val source: RedditSource =
-                createSource(
-                    """{"data":{"targetableCommunityInfo":null},"errors":[{"message":"Not found"}]}""",
-                )
-
-            try {
-                source.searchSubreddit("missing", null, null, null)
-                fail("Expected IOException")
-            } catch (exception: IOException) {
-                assertTrue(exception.message?.contains("Not found") == true)
             }
         }
 
@@ -847,7 +804,8 @@ class RedditSourceTest {
 
     private fun createSource(vararg responses: String): RedditSource {
         executor = FakeGraphQlExecutor(*responses)
-        return RedditSource(executor, moshi, Dispatchers.Unconfined)
+        mockSearchApi = FakeRedditSearchApi()
+        return RedditSource(executor, mockSearchApi, moshi, Dispatchers.Unconfined)
     }
 
     private fun postsByIdsJson(vararg posts: String): String =
@@ -901,28 +859,6 @@ class RedditSourceTest {
             }}}}
             """.trimIndent()
     }
-
-    private fun searchPostsJson(
-        ids: List<String>,
-        endCursor: String?,
-        hasNextPage: Boolean,
-    ): String {
-        val edges = ids.joinToString(",") { """{"node":${postJson(it, "Result")}}""" }
-        return """
-            {"data":{"search":{"general":{"posts":{
-              "pageInfo":{"endCursor":${endCursor.jsonValue()},"hasNextPage":$hasNextPage},
-              "edges":[$edges]
-            }}}}}
-            """.trimIndent()
-    }
-
-    private fun searchPostsRawJson(edges: String): String =
-        """
-        {"data":{"search":{"general":{"posts":{
-          "pageInfo":{"endCursor":null,"hasNextPage":false},
-          "edges":[$edges]
-        }}}}}
-        """.trimIndent()
 
     private fun searchPeopleJson(name: String): String =
         """
@@ -1021,6 +957,51 @@ class RedditSourceTest {
             calls += GraphQlCall(operation, variables)
             check(nextResponse < responses.size) { "No response for ${operation.name}" }
             return responses[nextResponse++]
+        }
+    }
+
+    private data class SearchCall(
+        val method: String,
+        val subreddit: String?,
+        val query: String,
+        val sort: String?,
+        val timeSorting: String?,
+        val after: String?,
+    )
+
+    private class FakeRedditSearchApi : RedditSearchApi {
+        val calls: MutableList<SearchCall> = mutableListOf()
+        val response: Listing = Listing("Listing", ListingData(null, 0, emptyList(), null, null))
+
+        override suspend fun searchPost(
+            query: String,
+            sort: String?,
+            timeSorting: String?,
+            after: String?,
+        ): Listing {
+            calls += SearchCall("searchPost", null, query, sort, timeSorting, after)
+            return response
+        }
+
+        override suspend fun searchInSubreddit(
+            subreddit: String,
+            query: String,
+            sort: String?,
+            timeSorting: String?,
+            after: String?,
+        ): Listing {
+            calls += SearchCall("searchInSubreddit", subreddit, query, sort, timeSorting, after)
+            return response
+        }
+
+        override suspend fun searchSubreddit(
+            query: String,
+            sort: String?,
+            timeSorting: String?,
+            after: String?,
+        ): Listing {
+            calls += SearchCall("searchSubreddit", null, query, sort, timeSorting, after)
+            return response
         }
     }
 }

@@ -1,6 +1,5 @@
 package com.cosmos.unreddit.data.remote.api.reddit.graphql
 
-import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommunitySearchResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.LiveCommentsByIdsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFeedElements
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFeedRoot
@@ -8,7 +7,6 @@ import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PopularFeedRespo
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PostCommentsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.PostsByIdsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SearchPeopleResponse
-import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SearchPostsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SubmittedCommentsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SubmittedPostsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.SubredditFeedResponse
@@ -233,20 +231,6 @@ class GraphQlModelsTest {
     }
 
     @Test
-    fun `parses a search posts response`() {
-        val inputJson =
-            """{"data":{"search":{"general":{"posts":{"pageInfo":{"endCursor":"t3_2","hasNextPage":true},"edges":[{"node":{"__typename":"SubredditPost","id":"t3_1","postTitle":"Result","permalink":"/r/Android/comments/1/a/","url":"https://example.com","createdAt":"2026-10-07T15:47:48.255000+0000","subreddit":{"name":"Android","prefixedName":"r/Android"}}}]}}}}}"""
-        val actualResponse =
-            Moshi.Builder().build().adapter(SearchPostsResponse::class.java).fromJson(inputJson)!!
-        val actualPosts = requireNotNull(actualResponse.data?.search?.general?.posts)
-        assertEquals("t3_2", actualPosts.pageInfo.endCursor)
-        val actualNode = actualPosts.edges.single().node
-        assertEquals("t3_1", actualNode.id)
-        assertEquals("Result", actualNode.postTitle)
-        assertEquals("r/Android", actualNode.subreddit!!.prefixedName)
-    }
-
-    @Test
     fun `parses a search people response`() {
         val inputJson =
             """{"data":{"search":{"general":{"authors":{"pageInfo":{"endCursor":"t2_1","hasNextPage":false},"edges":[{"node":{"id":"t2_1","name":"author","prefixedName":"u/author","icon_96":{"url":"https://example.com/icon-96.png","dimensions":{"width":96,"height":96}},"karma":{"total":10},"profile":{"isNsfw":true,"createdAt":"2026-10-07T15:47:48.255000+0000","styles":{"legacyIcon":{"url":"https://example.com/legacy-icon.png"}}}}}]}}}}}"""
@@ -261,28 +245,6 @@ class GraphQlModelsTest {
         assertEquals(true, actualNode.profile!!.isNsfw)
         assertEquals("2026-10-07T15:47:48.255000+0000", actualNode.profile!!.createdAt)
         assertEquals("https://example.com/legacy-icon.png", actualNode.profile!!.styles!!.legacyIcon!!.url)
-    }
-
-    @Test
-    fun `parses a community search response`() {
-        val inputJson =
-            """{"data":{"targetableCommunityInfo":[{"subredditInfo":{"name":"Android"},"iconUrl":"https://example.com/icon.png","description":"desc","subscriberCount":1000}]}}"""
-        val actualResponse =
-            Moshi.Builder().build().adapter(CommunitySearchResponse::class.java).fromJson(inputJson)!!
-        val actualCommunity = requireNotNull(actualResponse.data?.targetableCommunityInfo).single()
-        assertEquals("Android", actualCommunity.subredditInfo!!.name)
-        assertNull(actualCommunity.subredditInfo!!.prefixedName)
-        assertEquals(1000, actualCommunity.subscriberCount)
-        assertEquals("desc", actualCommunity.description)
-    }
-
-    @Test
-    fun `parses null targetable community info`() {
-        val inputJson = """{"data":{"targetableCommunityInfo":null}}"""
-        val actualResponse =
-            Moshi.Builder().build().adapter(CommunitySearchResponse::class.java).fromJson(inputJson)!!
-        assertNull(actualResponse.data?.targetableCommunityInfo)
-        assertNull(actualResponse.errors)
     }
 
     @Test

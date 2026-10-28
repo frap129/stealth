@@ -13,6 +13,12 @@ data class SearchPeopleResponse(
 data class SearchPeopleData(val search: GraphQlSearch? = null)
 
 @JsonClass(generateAdapter = true)
+data class GraphQlSearch(val general: GraphQlGeneralSearch? = null)
+
+@JsonClass(generateAdapter = true)
+data class GraphQlGeneralSearch(val authors: GraphQlPersonSearch? = null)
+
+@JsonClass(generateAdapter = true)
 data class GraphQlPersonSearch(
     val pageInfo: GraphQlPageInfo,
     val edges: List<GraphQlPersonEdge>,
