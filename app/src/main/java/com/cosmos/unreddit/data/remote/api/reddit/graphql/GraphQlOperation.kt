@@ -22,4 +22,5 @@ object RedditGraphQlOperations {
     val SearchPosts = GraphQlOperation("SearchPosts", "08c50e2f9868ea1b8c4411cca57cd58353c729b4fa714cef66448600f76b0922")
     val SearchPeople = GraphQlOperation("SearchPeople", "db3607c1a7deea8441614a053c5f434f60da0c8c931db952f819a59d534d9743")
     val CommunitySearch = GraphQlOperation("CommunitySearch", "ea096984f5a2caf0122cca8f06039c71a0c8ecc99516a7e3782f71b249572133")
+    val CommunityPickerSearch = GraphQlOperation("CommunityPickerSearch", "dae7d378f5f24c220ed29ed6795a94fdb954f3e3c35b346c229165c3404537bb")
 }

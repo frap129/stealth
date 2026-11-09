@@ -1,6 +1,7 @@
 package com.cosmos.unreddit.data.remote.api.reddit.graphql
 
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlSubredditMapper
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlCommunityPickerNode
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlCommunityStats
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlContent
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlPersonIcon
@@ -263,6 +264,52 @@ class GraphQlSubredditMapperTest {
         assertNull(actualData.descriptionHtml)
         assertEquals("https://www.reddit.com/r/Android", actualData.url)
         assertEquals(0L, actualData.created)
+    }
+
+    @Test
+    fun `maps a community picker result to about data`() {
+        val inputCommunity: GraphQlCommunityPickerNode =
+            GraphQlCommunityPickerNode(
+                id = "t5_1",
+                name = "gonewild",
+                prefixedName = "r/gonewild",
+                subscribersCount = 5_718_455.0,
+                isNsfw = true,
+                isQuarantined = false,
+                publicDescriptionText = "Adults only",
+                styles =
+                    GraphQlSubredditStyles(
+                        icon = "https://example.com/icon.png",
+                        primaryColor = "#ff4500",
+                        legacyPrimaryColor = "#ff0000",
+                        legacyIcon = GraphQlPersonIcon("https://example.com/legacy-icon.png"),
+                    ),
+            )
+        val inputMapper: GraphQlSubredditMapper = GraphQlSubredditMapper()
+        val actualData: AboutData = inputMapper.toAboutData(inputCommunity)
+        assertEquals("gonewild", actualData.displayName)
+        assertEquals("gonewild", actualData.title)
+        assertEquals("https://example.com/icon.png", actualData.iconImg)
+        assertEquals(5_718_455, actualData.subscribers)
+        assertEquals("#ff4500", actualData.primaryColor)
+        assertEquals("#ff0000", actualData.keyColor)
+        assertEquals("Adults only", actualData.publicDescriptionHtml)
+        assertEquals(true, actualData.over18)
+        assertEquals("https://www.reddit.com/r/gonewild", actualData.url)
+        assertEquals(0L, actualData.created)
+    }
+
+    @Test
+    fun `maps a community picker result with a missing name to defaults`() {
+        val inputCommunity: GraphQlCommunityPickerNode = GraphQlCommunityPickerNode()
+        val inputMapper: GraphQlSubredditMapper = GraphQlSubredditMapper()
+        val actualData: AboutData = inputMapper.toAboutData(inputCommunity)
+        assertEquals("", actualData.displayName)
+        assertEquals("", actualData.title)
+        assertEquals("", actualData.url)
+        assertNull(actualData.iconImg)
+        assertNull(actualData.subscribers)
+        assertNull(actualData.publicDescriptionHtml)
     }
 
     @Test

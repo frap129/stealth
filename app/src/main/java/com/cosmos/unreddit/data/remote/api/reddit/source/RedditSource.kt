@@ -8,7 +8,7 @@ import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlCommentM
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlPostMapper
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlSubredditMapper
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper.GraphQlUserMapper
-import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommunitySearchResponse
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommunityPickerSearchResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlComment
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlError
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFeedElements
@@ -77,8 +77,8 @@ class RedditSource @Inject constructor(
         moshi.adapter(SearchPostsResponse::class.java)
     private val searchPeopleAdapter: JsonAdapter<SearchPeopleResponse> =
         moshi.adapter(SearchPeopleResponse::class.java)
-    private val communitySearchAdapter: JsonAdapter<CommunitySearchResponse> =
-        moshi.adapter(CommunitySearchResponse::class.java)
+    private val communityPickerSearchAdapter: JsonAdapter<CommunityPickerSearchResponse> =
+        moshi.adapter(CommunityPickerSearchResponse::class.java)
     private val postCommentsAdapter: JsonAdapter<PostCommentsResponse> =
         moshi.adapter(PostCommentsResponse::class.java)
     private val liveCommentsAdapter: JsonAdapter<LiveCommentsByIdsResponse> =
@@ -145,6 +145,7 @@ class RedditSource @Inject constructor(
                 "productSurface" to SEARCH_PRODUCT_SURFACE,
                 "sort" to sort.toSearchSort(),
                 "afterCursor" to after,
+                "filters" to NSFW_FILTERS,
             ),
         )
     }
@@ -333,6 +334,7 @@ class RedditSource @Inject constructor(
                 "productSurface" to SEARCH_PRODUCT_SURFACE,
                 "sort" to sort.toSearchSort(),
                 "afterCursor" to after,
+                "filters" to NSFW_FILTERS,
             ),
         )
     }
@@ -349,6 +351,7 @@ class RedditSource @Inject constructor(
                 "productSurface" to SEARCH_PRODUCT_SURFACE,
                 "afterCursor" to after,
                 "sort" to sort.toSearchSort(),
+                "filters" to NSFW_FILTERS,
             )
         val response: SearchPeopleResponse =
             parse(searchPeopleAdapter, client.execute(RedditGraphQlOperations.SearchPeople, variables))
@@ -363,7 +366,7 @@ class RedditSource @Inject constructor(
     }
 
     /**
-     * CommunitySearch exposes no cursor and returns a single page of communities.
+     * CommunityPickerSearch exposes no cursor and returns a single page of communities.
      */
     override suspend fun searchSubreddit(
         query: String,
@@ -371,18 +374,26 @@ class RedditSource @Inject constructor(
         timeSorting: TimeSorting?,
         after: String?,
     ): Listing = withContext(ioDispatcher) {
-        val response: CommunitySearchResponse =
+        val response: CommunityPickerSearchResponse =
             parse(
-                communitySearchAdapter,
-                client.execute(RedditGraphQlOperations.CommunitySearch, mapOf("query" to query)),
+                communityPickerSearchAdapter,
+                client.execute(
+                    RedditGraphQlOperations.CommunityPickerSearch,
+                    mapOf("query" to query, "isNsfwIncluded" to true),
+                ),
             )
         val data = requireData(response.data, response.errors)
-        val communities = requireField(
-            data.targetableCommunityInfo,
+        val typeahead = requireField(
+            data.subredditTypeahead,
             response.errors,
-            "Missing targetable communities",
+            "Missing subreddit typeahead",
         )
-        listing(communities.map { AboutChild(subredditMapper.toAboutData(it)) })
+        val subreddits = requireField(
+            typeahead.subreddits,
+            response.errors,
+            "Missing search subreddits",
+        )
+        listing(subreddits.edges.map { AboutChild(subredditMapper.toAboutData(it.node)) })
     }
 
     private suspend fun postsListing(
@@ -634,6 +645,8 @@ class RedditSource @Inject constructor(
         private const val SUBREDDIT_TYPENAME: String = "Subreddit"
         private const val UNAVAILABLE_REDDITOR_TYPENAME: String = "UnavailableRedditor"
         private const val DELETED_REDDITOR_TYPENAME: String = "DeletedRedditor"
+        private val NSFW_FILTERS: List<Map<String, String>> =
+            listOf(mapOf("key" to "nsfw", "value" to "1"))
         private val RENDERABLE_POST_TYPENAMES: Set<String> =
             setOf("SubredditPost", "ProfilePost")
         private val POST_OWNER_SEGMENTS: Set<String> = setOf("r", "u", "user")

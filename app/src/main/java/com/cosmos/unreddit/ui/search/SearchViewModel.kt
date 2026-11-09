@@ -120,7 +120,11 @@ class SearchViewModel @Inject constructor(
         data: Data.Fetch,
         user: Data.User
     ): Flow<PagingData<PostEntity>> {
-        return repository.searchPost(data.query, data.sorting)
+        return repository.searchPost(
+            data.query,
+            data.sorting,
+            includeNsfw = user.contentPreferences.showNsfw,
+        )
             .map { pagingData ->
                 PostUtil.filterPosts(pagingData, user, postMapper, defaultDispatcher)
             }

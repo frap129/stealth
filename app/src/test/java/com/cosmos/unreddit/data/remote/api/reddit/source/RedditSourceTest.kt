@@ -488,11 +488,11 @@ class RedditSourceTest {
         }
 
     @Test
-    fun `searchSubreddit sends community search and returns about children`() =
+    fun `searchSubreddit includes nsfw communities and returns about children`() =
         runTest {
             val source =
                 createSource(
-                    """{"data":{"targetableCommunityInfo":[{"subredditInfo":{"name":"Android"},"iconUrl":"https://example.com/icon.png","description":"desc","subscriberCount":1000}]}}""",
+                    """{"data":{"subredditTypeahead":{"subreddits":{"edges":[{"node":{"id":"t5_1","name":"Android","prefixedName":"r/Android","subscribersCount":1000,"isNsfw":true,"isQuarantined":false,"publicDescriptionText":"desc","styles":{"icon":"https://example.com/icon.png"}}}]}}}}""",
                 )
 
             val actualListing =
@@ -501,8 +501,13 @@ class RedditSourceTest {
             val actualChild = actualListing.data.children.single() as AboutChild
             assertEquals("Android", actualChild.data.displayName)
             assertEquals(1000, actualChild.data.subscribers)
-            assertEquals(RedditGraphQlOperations.CommunitySearch, executor.calls.single().operation)
+            assertEquals(true, actualChild.data.over18)
+            assertEquals(
+                RedditGraphQlOperations.CommunityPickerSearch,
+                executor.calls.single().operation,
+            )
             assertEquals("android", executor.calls.single().variables["query"])
+            assertEquals(true, executor.calls.single().variables["isNsfwIncluded"])
             assertNull(actualListing.data.after)
         }
 
@@ -666,6 +671,10 @@ class RedditSourceTest {
             assertEquals("SEARCH", executor.calls.single().variables["productSurface"])
             assertEquals("NEW", executor.calls.single().variables["sort"])
             assertEquals("after", executor.calls.single().variables["afterCursor"])
+            assertEquals(
+                listOf(mapOf("key" to "nsfw", "value" to "1")),
+                executor.calls.single().variables["filters"],
+            )
             assertFalse(executor.calls.single().variables.containsKey("time"))
         }
 
@@ -681,6 +690,10 @@ class RedditSourceTest {
             assertEquals(RedditGraphQlOperations.SearchPosts, executor.calls.single().operation)
             assertEquals("pixel", executor.calls.single().variables["query"])
             assertEquals("SEARCH", executor.calls.single().variables["productSurface"])
+            assertEquals(
+                listOf(mapOf("key" to "nsfw", "value" to "1")),
+                executor.calls.single().variables["filters"],
+            )
             assertFalse(executor.calls.single().variables.containsKey("sort"))
             assertFalse(executor.calls.single().variables.containsKey("afterCursor"))
         }
@@ -720,6 +733,10 @@ class RedditSourceTest {
             assertEquals("author", executor.calls.single().variables["query"])
             assertEquals("SEARCH", executor.calls.single().variables["productSurface"])
             assertEquals("TOP", executor.calls.single().variables["sort"])
+            assertEquals(
+                listOf(mapOf("key" to "nsfw", "value" to "1")),
+                executor.calls.single().variables["filters"],
+            )
             assertFalse(executor.calls.single().variables.containsKey("afterCursor"))
         }
 

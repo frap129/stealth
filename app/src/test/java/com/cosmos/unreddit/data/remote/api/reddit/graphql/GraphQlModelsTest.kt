@@ -1,5 +1,6 @@
 package com.cosmos.unreddit.data.remote.api.reddit.graphql
 
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommunityPickerSearchResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.CommunitySearchResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.LiveCommentsByIdsResponse
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlFeedElements
@@ -274,6 +275,29 @@ class GraphQlModelsTest {
         assertNull(actualCommunity.subredditInfo!!.prefixedName)
         assertEquals(1000, actualCommunity.subscriberCount)
         assertEquals("desc", actualCommunity.description)
+    }
+
+    @Test
+    fun `parses a community picker search response`() {
+        val inputJson =
+            """{"data":{"subredditTypeahead":{"subreddits":{"edges":[{"node":{"id":"t5_1","name":"gonewild","prefixedName":"r/gonewild","subscribersCount":5718455.0,"isNsfw":true,"isQuarantined":false,"publicDescriptionText":"Adults only","styles":{"icon":"https://example.com/icon.png","legacyIcon":{"url":"https://example.com/legacy-icon.png"}}}}]}}}}"""
+        val actualResponse =
+            Moshi.Builder()
+                .build()
+                .adapter(CommunityPickerSearchResponse::class.java)
+                .fromJson(inputJson)!!
+        val actualCommunity =
+            requireNotNull(actualResponse.data?.subredditTypeahead?.subreddits)
+                .edges
+                .single()
+                .node
+        assertEquals("t5_1", actualCommunity.id)
+        assertEquals("gonewild", actualCommunity.name)
+        assertEquals("r/gonewild", actualCommunity.prefixedName)
+        assertEquals(5718455.0, actualCommunity.subscribersCount)
+        assertEquals(true, actualCommunity.isNsfw)
+        assertEquals("Adults only", actualCommunity.publicDescriptionText)
+        assertEquals("https://example.com/icon.png", actualCommunity.styles!!.icon)
     }
 
     @Test

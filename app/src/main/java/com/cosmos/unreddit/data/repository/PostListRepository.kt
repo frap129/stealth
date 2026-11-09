@@ -156,10 +156,11 @@ class PostListRepository @Inject constructor(
     fun searchPost(
         query: String,
         sorting: Sorting,
-        pageSize: Int = DEFAULT_LIMIT
+        pageSize: Int = DEFAULT_LIMIT,
+        includeNsfw: Boolean = false
     ): Flow<PagingData<Child>> {
         return Pager(PagingConfig(pageSize = pageSize)) {
-            SearchPostDataSource(source, query, sorting)
+            SearchPostDataSource(source, query, sorting, includeNsfw)
         }.flow
     }
 

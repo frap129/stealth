@@ -1,5 +1,6 @@
 package com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper
 
+import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlCommunityPickerNode
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlContent
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlSubredditInfo
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlSubredditStyles
@@ -56,6 +57,33 @@ class GraphQlSubredditMapper @Inject constructor() {
             keyColor = null,
             bannerBackgroundColor = null,
             over18 = false,
+            descriptionHtml = null,
+            url = if (name.isEmpty()) "" else "https://www.reddit.com/r/$name",
+            created = 0L,
+        )
+    }
+
+    fun toAboutData(community: GraphQlCommunityPickerNode): AboutData {
+        val name: String = community.name.orEmpty()
+        val styles: GraphQlSubredditStyles? = community.styles
+        val iconUrl: String? = styles?.icon?.takeIf { it.isNotBlank() }
+            ?: styles?.legacyIcon?.url?.takeIf { it.isNotBlank() }
+        return AboutData(
+            wikiEnabled = false,
+            displayName = name,
+            headerImg = null,
+            title = name,
+            primaryColor = styles?.primaryColor,
+            activeUserCount = null,
+            iconImg = iconUrl,
+            subscribers = community.subscribersCount?.toInt(),
+            quarantine = community.isQuarantined,
+            publicDescriptionHtml = community.publicDescriptionText.escapeHtml(),
+            communityIcon = iconUrl.orEmpty(),
+            bannerBackgroundImage = "",
+            keyColor = styles?.legacyPrimaryColor,
+            bannerBackgroundColor = null,
+            over18 = community.isNsfw,
             descriptionHtml = null,
             url = if (name.isEmpty()) "" else "https://www.reddit.com/r/$name",
             created = 0L,
