@@ -2,6 +2,7 @@ package com.cosmos.unreddit.data.remote.api.reddit.graphql.mapper
 
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlContent
 import com.cosmos.unreddit.data.remote.api.reddit.graphql.model.GraphQlRichTextMedia
+import com.squareup.moshi.Moshi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -44,16 +45,38 @@ class RichTextHtmlConverterTest {
     }
 
     @Test
-    fun `prefers html for text-only posts`() {
-        val content: GraphQlContent =
-            GraphQlContent(
-                html = "<p>Hello</p>",
-                richtext = """{"document":[{"e":"par","c":[{"e":"text","t":"Hello"}]}]}""",
+    fun `prefers formatted richtext when html is plain text`() {
+        val inputJson: String =
+            """
+            {
+              "html": "Hello bold and link\nNext paragraph",
+              "markdown": "Hello **bold** and [link](https://example.com)\n\nNext paragraph",
+              "richtext": "{\"document\":[{\"e\":\"par\",\"c\":[{\"e\":\"text\",\"t\":\"Hello \"},{\"e\":\"text\",\"t\":\"bold\",\"f\":[[1,0,4]]},{\"e\":\"text\",\"t\":\" and \"},{\"e\":\"link\",\"t\":\"link\",\"u\":\"https://example.com\"}]},{\"e\":\"par\",\"c\":[{\"e\":\"text\",\"t\":\"Next paragraph\"}]}]}"
+            }
+            """.trimIndent()
+        val inputContent: GraphQlContent =
+            requireNotNull(
+                Moshi.Builder()
+                    .build()
+                    .adapter(GraphQlContent::class.java)
+                    .fromJson(inputJson),
             )
+        val actualHtml: String? = RichTextHtmlConverter.toHtml(inputContent)
+        val expectedHtml: String =
+            """<p>Hello <b>bold</b> and <a href="https://example.com">link</a></p><p>Next paragraph</p>"""
+        assertEquals(expectedHtml, actualHtml)
+    }
 
-        val actual: String? = RichTextHtmlConverter.toHtml(content)
-
-        assertEquals("<p>Hello</p>", actual)
+    @Test
+    fun `falls back to html when richtext renders no content`() {
+        val inputContent: GraphQlContent =
+            GraphQlContent(
+                html = "<p>Fallback</p>",
+                richtext = """{"document":[]}""",
+            )
+        val actualHtml: String? = RichTextHtmlConverter.toHtml(inputContent)
+        val expectedHtml: String = "<p>Fallback</p>"
+        assertEquals(expectedHtml, actualHtml)
     }
 
     @Test

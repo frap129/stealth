@@ -17,11 +17,10 @@ object RichTextHtmlConverter {
             content.richtextMedia.associateBy { it.id.orEmpty() }
         val rendered: RichTextRenderResult? =
             content.richtext?.takeIf { it.isNotBlank() }?.let { render(it, mediaById) }
-        val html: String? = content.html?.takeIf { it.isNotBlank() }
         val renderedHtml: String? = rendered?.html?.takeIf { it.isNotBlank() }
-        if (renderedHtml != null && (html == null || rendered.hasMedia)) {
-            return renderedHtml
-        }
+        // Reddit's html field may be plain text; richtext retains formatting and links.
+        if (renderedHtml != null) return renderedHtml
+        val html: String? = content.html?.takeIf { it.isNotBlank() }
         return html ?: content.markdown?.let { resolveMarkdownMedia(it, mediaById) }
     }
 
