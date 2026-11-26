@@ -84,24 +84,11 @@ class GraphQlPostMapper @Inject constructor() {
 
     private fun GraphQlMedia.toMedia(): Media? {
         val streaming: GraphQlStreaming? = streaming ?: video
-        val packagedUrl: String? =
-            packagedMedia?.playbackMp4s?.permutations
-                .orEmpty()
-                .filter { permutation: GraphQlPlaybackPermutation ->
-                    permutation.source?.url?.isProgressiveRedditMp4() == true
-                }
-                .maxWithOrNull(
-                    compareBy<GraphQlPlaybackPermutation> { it.resolutionArea() }
-                        .thenBy { it.bitrateBps },
-                )
-                ?.source?.url
         val animatedSource: GraphQlMediaSource? = animated?.mp4Source
         val animatedUrl: String? =
             animatedSource?.url?.takeIf { url: String -> LinkUtil.isAnimatedRedditMp4(url) }
         val fallbackUrl: String =
-            packagedUrl
-                ?: streaming?.dashUrl?.takeIf { url: String -> url.isPlayableManifest(".mpd") }
-                ?: streaming?.hlsUrl?.takeIf { url: String -> url.isPlayableManifest(".m3u8") }
+            selectPlaybackUrl(streaming)
                 ?: streaming?.scrubberMediaUrl?.takeIf { url: String -> url.isProgressiveRedditMp4() }
                 ?: animatedUrl
                 ?: return null
@@ -122,11 +109,57 @@ class GraphQlPostMapper @Inject constructor() {
         )
     }
 
-    private fun GraphQlPlaybackPermutation.resolutionArea(): Int {
-        val mediaSource: GraphQlMediaSource = source ?: return 0
-        val width: Int = mediaSource.dimensions?.width ?: mediaSource.width
-        val height: Int = mediaSource.dimensions?.height ?: mediaSource.height
-        return width * height
+    private fun GraphQlMedia.selectPlaybackUrl(streaming: GraphQlStreaming?): String? {
+        val packagedPlayback: GraphQlPlaybackPermutation? = highestResolutionPackagedPlayback()
+        val packagedUrl: String? = packagedPlayback?.source?.url
+        val manifestUrl: String? =
+            streaming?.dashUrl?.takeIf { url: String -> url.isPlayableManifest(".mpd") }
+                ?: streaming?.hlsUrl?.takeIf { url: String -> url.isPlayableManifest(".m3u8") }
+        return if (streaming.hasHigherResolutionThan(packagedPlayback)) {
+            manifestUrl ?: packagedUrl
+        } else {
+            packagedUrl ?: manifestUrl
+        }
+    }
+
+    private fun GraphQlMedia.highestResolutionPackagedPlayback(): GraphQlPlaybackPermutation? =
+        packagedMedia?.playbackMp4s?.permutations
+            .orEmpty()
+            .filter { permutation: GraphQlPlaybackPermutation ->
+                permutation.source?.url?.isProgressiveRedditMp4() == true
+            }
+            .maxWithOrNull(
+                compareBy<GraphQlPlaybackPermutation> { it.resolutionArea() }
+                    .thenBy { it.bitrateBps },
+            )
+
+    private fun GraphQlStreaming?.hasHigherResolutionThan(
+        packagedPlayback: GraphQlPlaybackPermutation?,
+    ): Boolean {
+        val source: GraphQlStreaming = this ?: return false
+        val packaged: GraphQlPlaybackPermutation = packagedPlayback ?: return false
+        val sourceArea: Long = source.resolutionArea()
+        val packagedArea: Long = packaged.resolutionArea()
+        return packagedArea > NO_RESOLUTION_AREA && sourceArea > packagedArea
+    }
+
+    private fun GraphQlPlaybackPermutation.resolutionArea(): Long {
+        val mediaSource: GraphQlMediaSource = source ?: return NO_RESOLUTION_AREA
+        val width: Int = mediaSource.resolvedWidth
+        val height: Int = mediaSource.resolvedHeight
+        if (width <= 0 || height <= 0) {
+            return NO_RESOLUTION_AREA
+        }
+        return width.toLong() * height
+    }
+
+    private fun GraphQlStreaming.resolutionArea(): Long {
+        val width: Int = resolvedWidth
+        val height: Int = resolvedHeight
+        if (width <= 0 || height <= 0) {
+            return NO_RESOLUTION_AREA
+        }
+        return width.toLong() * height
     }
 
     private fun String.isProgressiveRedditMp4(): Boolean {
@@ -209,6 +242,7 @@ class GraphQlPostMapper @Inject constructor() {
     )
 
     private companion object {
+        private const val NO_RESOLUTION_AREA: Long = 0L
         private val REDDIT_VIDEO_HOSTS: Set<String> =
             setOf("v.redd.it", "packaged-media.redd.it")
     }

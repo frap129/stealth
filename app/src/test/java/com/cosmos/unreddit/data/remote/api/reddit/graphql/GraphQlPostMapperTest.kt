@@ -630,6 +630,373 @@ class GraphQlPostMapperTest {
     }
 
     @Test
+    fun `prefers dash manifest when packaged mp4 has lower resolution than source`() {
+        val inputJson: String =
+            """
+            {"data":{"postsInfoByIds":[{
+              "__typename":"SubredditPost",
+              "id":"t3_1y5w5tw",
+              "postTitle":"Brazil's Christ the Redeemer appears to float above the clouds",
+              "permalink":"/r/interestingasfuck/comments/1y5w5tw/brazils_christ_the_redeemer_appears_to_float/",
+              "url":"https://v.redd.it/8yf4auqn4x3i1",
+              "domain":"v.redd.it",
+              "createdAt":"2026-11-26T08:34:13.534000+0000",
+              "media":{
+                "streaming":{
+                  "__typename":"StreamingMedia",
+                  "dashUrl":"https://v.redd.it/8yf4auqn4x3i1/DASHPlaylist.mpd?f=hd%2CsubsAll%2ChlsSpecOrder%2Cvp9&v=1&a=1798301895%2CYzBkYmQwZDlmMGZmODI1ZGQxZDVmY2I1NDkyODFiZDNlY2E3MmJkMDFhYWJhMWYyZDQ5YTE4OTExMTEwZjIzZA%3D%3D",
+                  "dimensions":{"height":1920,"width":1080},
+                  "duration":24,
+                  "hlsUrl":"https://v.redd.it/8yf4auqn4x3i1/HLSPlaylist.m3u8?f=hd%2CsubsAll%2ChlsSpecOrder%2Cvp9&v=1&a=1798301895%2CYzI2NmE5MjJhZjk1MWZlYTFkZWZjOTc1NzgyNGJkMzJkYzc3MjI4ZTY1NThiNTRjZWYxNzFkZWVmYjVjY2U4Nw%3D%3D",
+                  "isGif":false,
+                  "scrubberMediaUrl":"https://v.redd.it/8yf4auqn4x3i1/CMAF_96.mp4"
+                },
+                "packagedMedia":{
+                  "__typename":"PackagedMedia",
+                  "playbackMp4s":{
+                    "duration":24,
+                    "permutations":[
+                      {"source":{"bitrateBps":1053544,"dimensions":{"height":854,"width":480},"url":"https://packaged-media.redd.it/8yf4auqn4x3i1/pb/m2-res_854p.mp4?m=DASHPlaylist.mpd&c=wh_ben_en&var=sgpssan&v=1&e=1795726800&s=4e78a58a115c3a4952cf1ca642f9966b4c48e31f","videoCodec":"H264"}},
+                      {"source":{"bitrateBps":1903396,"dimensions":{"height":1280,"width":720},"url":"https://packaged-media.redd.it/8yf4auqn4x3i1/pb/m2-res_1280p.mp4?m=DASHPlaylist.mpd&c=wh_ben_en&var=sgpssan&v=1&e=1795726800&s=12e3b9395476aaccd840126e7eea625f1d2ce96d","videoCodec":"H264"}}
+                    ]
+                  }
+                }
+              }
+            }]}}
+            """.trimIndent()
+        val inputResponse: PostsByIdsResponse =
+            requireNotNull(
+                Moshi.Builder()
+                    .build()
+                    .adapter(PostsByIdsResponse::class.java)
+                    .fromJson(inputJson),
+            )
+        val inputNode: GraphQlPostNode =
+            requireNotNull(requireNotNull(inputResponse.data?.postsInfoByIds).single())
+        val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
+
+        val actualPost: PostData = inputMapper.toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        val expectedDashUrl: String =
+            "https://v.redd.it/8yf4auqn4x3i1/DASHPlaylist.mpd?f=hd%2CsubsAll%2ChlsSpecOrder%2Cvp9&v=1&a=1798301895%2CYzBkYmQwZDlmMGZmODI1ZGQxZDVmY2I1NDkyODFiZDNlY2E3MmJkMDFhYWJhMWYyZDQ5YTE4OTExMTEwZjIzZA%3D%3D"
+
+        assertEquals(expectedDashUrl, actualVideo.fallbackUrl)
+        assertEquals(expectedDashUrl, actualPost.mediaUrl)
+    }
+
+    @Test
+    fun `prefers hls manifest when packaged mp4 has lower resolution and dash is absent`() {
+        val inputHlsUrl: String = "https://v.redd.it/video/HLSPlaylist.m3u8"
+        val inputPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_video",
+                postTitle = "A video",
+                permalink = "/r/Android/comments/video/a_video/",
+                url = "https://v.redd.it/video",
+                domain = "v.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        streaming =
+                            GraphQlStreaming(
+                                hlsUrl = inputHlsUrl,
+                                dimensions = GraphQlDimensions(width = 1080, height = 1920),
+                            ),
+                        packagedMedia =
+                            GraphQlPackagedMedia(
+                                playbackMp4s =
+                                    GraphQlPlaybackMp4s(
+                                        permutations =
+                                            listOf(
+                                                GraphQlPlaybackPermutation(
+                                                    source =
+                                                        GraphQlMediaSource(
+                                                            url = inputPackagedUrl,
+                                                            dimensions =
+                                                                GraphQlDimensions(
+                                                                    width = 720,
+                                                                    height = 1280,
+                                                                ),
+                                                        ),
+                                                ),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            )
+        val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
+
+        val actualPost: PostData = inputMapper.toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        val expectedHlsUrl: String = "https://v.redd.it/video/HLSPlaylist.m3u8"
+
+        assertEquals(expectedHlsUrl, actualVideo.fallbackUrl)
+    }
+
+    @Test
+    fun `prefers packaged mp4 when its resolution matches the source`() {
+        val inputDashUrl: String = "https://v.redd.it/video/DASHPlaylist.mpd"
+        val inputPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_video",
+                postTitle = "A video",
+                permalink = "/r/Android/comments/video/a_video/",
+                url = "https://v.redd.it/video",
+                domain = "v.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        streaming =
+                            GraphQlStreaming(
+                                dashUrl = inputDashUrl,
+                                dimensions = GraphQlDimensions(width = 1280, height = 720),
+                            ),
+                        packagedMedia =
+                            GraphQlPackagedMedia(
+                                playbackMp4s =
+                                    GraphQlPlaybackMp4s(
+                                        permutations =
+                                            listOf(
+                                                GraphQlPlaybackPermutation(
+                                                    source =
+                                                        GraphQlMediaSource(
+                                                            url = inputPackagedUrl,
+                                                            dimensions =
+                                                                GraphQlDimensions(
+                                                                    width = 1280,
+                                                                    height = 720,
+                                                                ),
+                                                        ),
+                                                ),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            )
+        val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
+
+        val actualPost: PostData = inputMapper.toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        val expectedPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+
+        assertEquals(expectedPackagedUrl, actualVideo.fallbackUrl)
+    }
+
+    @Test
+    fun `prefers packaged mp4 when source dimensions are missing`() {
+        val inputDashUrl: String = "https://v.redd.it/video/DASHPlaylist.mpd"
+        val inputPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_video",
+                postTitle = "A video",
+                permalink = "/r/Android/comments/video/a_video/",
+                url = "https://v.redd.it/video",
+                domain = "v.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        streaming = GraphQlStreaming(dashUrl = inputDashUrl),
+                        packagedMedia =
+                            GraphQlPackagedMedia(
+                                playbackMp4s =
+                                    GraphQlPlaybackMp4s(
+                                        permutations =
+                                            listOf(
+                                                GraphQlPlaybackPermutation(
+                                                    source =
+                                                        GraphQlMediaSource(
+                                                            url = inputPackagedUrl,
+                                                            dimensions =
+                                                                GraphQlDimensions(
+                                                                    width = 1280,
+                                                                    height = 720,
+                                                                ),
+                                                        ),
+                                                ),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            )
+        val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
+
+        val actualPost: PostData = inputMapper.toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        val expectedPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+
+        assertEquals(expectedPackagedUrl, actualVideo.fallbackUrl)
+    }
+
+    @Test
+    fun `prefers packaged mp4 when source dimensions are non-positive`() {
+        val inputDashUrl: String = "https://v.redd.it/video/DASHPlaylist.mpd"
+        val inputPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_video",
+                postTitle = "A video",
+                permalink = "/r/Android/comments/video/a_video/",
+                url = "https://v.redd.it/video",
+                domain = "v.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        streaming =
+                            GraphQlStreaming(
+                                dashUrl = inputDashUrl,
+                                dimensions = GraphQlDimensions(width = -1080, height = -1920),
+                            ),
+                        packagedMedia =
+                            GraphQlPackagedMedia(
+                                playbackMp4s =
+                                    GraphQlPlaybackMp4s(
+                                        permutations =
+                                            listOf(
+                                                GraphQlPlaybackPermutation(
+                                                    source =
+                                                        GraphQlMediaSource(
+                                                            url = inputPackagedUrl,
+                                                            dimensions =
+                                                                GraphQlDimensions(
+                                                                    width = 720,
+                                                                    height = 1280,
+                                                                ),
+                                                        ),
+                                                ),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            )
+        val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
+
+        val actualPost: PostData = inputMapper.toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        val expectedPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+
+        assertEquals(expectedPackagedUrl, actualVideo.fallbackUrl)
+    }
+
+    @Test
+    fun `prefers packaged mp4 when packaged dimensions are non-positive`() {
+        val inputDashUrl: String = "https://v.redd.it/video/DASHPlaylist.mpd"
+        val inputPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_video",
+                postTitle = "A video",
+                permalink = "/r/Android/comments/video/a_video/",
+                url = "https://v.redd.it/video",
+                domain = "v.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        streaming =
+                            GraphQlStreaming(
+                                dashUrl = inputDashUrl,
+                                dimensions = GraphQlDimensions(width = 1080, height = 1920),
+                            ),
+                        packagedMedia =
+                            GraphQlPackagedMedia(
+                                playbackMp4s =
+                                    GraphQlPlaybackMp4s(
+                                        permutations =
+                                            listOf(
+                                                GraphQlPlaybackPermutation(
+                                                    source =
+                                                        GraphQlMediaSource(
+                                                            url = inputPackagedUrl,
+                                                            dimensions =
+                                                                GraphQlDimensions(
+                                                                    width = -720,
+                                                                    height = -1280,
+                                                                ),
+                                                        ),
+                                                ),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            )
+        val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
+
+        val actualPost: PostData = inputMapper.toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        val expectedPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+
+        assertEquals(expectedPackagedUrl, actualVideo.fallbackUrl)
+    }
+
+    @Test
+    fun `prefers packaged mp4 when no higher resolution manifest is available`() {
+        val inputPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_video",
+                postTitle = "A video",
+                permalink = "/r/Android/comments/video/a_video/",
+                url = "https://v.redd.it/video",
+                domain = "v.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        streaming =
+                            GraphQlStreaming(
+                                dimensions = GraphQlDimensions(width = 1080, height = 1920),
+                            ),
+                        packagedMedia =
+                            GraphQlPackagedMedia(
+                                playbackMp4s =
+                                    GraphQlPlaybackMp4s(
+                                        permutations =
+                                            listOf(
+                                                GraphQlPlaybackPermutation(
+                                                    source =
+                                                        GraphQlMediaSource(
+                                                            url = inputPackagedUrl,
+                                                            dimensions =
+                                                                GraphQlDimensions(
+                                                                    width = 720,
+                                                                    height = 1280,
+                                                                ),
+                                                        ),
+                                                ),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            )
+        val inputMapper: GraphQlPostMapper = GraphQlPostMapper()
+
+        val actualPost: PostData = inputMapper.toPostData(inputNode)
+        val actualVideo: RedditVideoPreview =
+            requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+        val expectedPackagedUrl: String =
+            "https://packaged-media.redd.it/video/pb/m2-res_720p.mp4?m=DASHPlaylist.mpd"
+
+        assertEquals(expectedPackagedUrl, actualVideo.fallbackUrl)
+    }
+
+    @Test
     fun `maps packaged reddit gif from a wire response`() {
         val inputJson =
             """
