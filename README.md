@@ -6,11 +6,8 @@ Stealth is an account-free, privacy-oriented, and feature-rich Reddit client.
 
 It provides features from Reddit, without the need for an account. In fact, the app doesn't even let you log in with a Reddit account.
 
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
-     alt="Get it on F-Droid"
-     height="80">](https://f-droid.org/packages/com.cosmos.unreddit/)
-
-Join Stealth on Matrix: [#stealth-app:matrix.org](https://matrix.to/#/#stealth-app:matrix.org)
+> [!IMPORTANT]
+> This is an unofficial fork of [Stealth](https://gitlab.com/cosmosapps/stealth) that continues its legacy.
 
 ## Features
 
