@@ -94,8 +94,11 @@ class MediaViewerViewModel
             MediaType.IMGUR_GIF -> {
                 setMedia(GalleryMedia.singleton(Type.VIDEO, LinkUtil.getImgurVideo(link)))
             }
-            MediaType.REDDIT_GIF, MediaType.IMGUR_VIDEO, MediaType.VIDEO -> {
+            MediaType.REDDIT_GIF, MediaType.IMGUR_VIDEO -> {
                 setMedia(GalleryMedia.singleton(Type.VIDEO, link))
+            }
+            MediaType.VIDEO -> {
+                setMedia(GalleryMedia.singleton(resolveVideoMediaType(link), link))
             }
             MediaType.REDDIT_VIDEO -> {
                 setMedia(
@@ -217,3 +220,10 @@ class MediaViewerViewModel
         _selectedPage.updateValue(position)
     }
 }
+
+internal fun resolveVideoMediaType(link: String): GalleryMedia.Type =
+    if (LinkUtil.isGifUrl(link)) {
+        GalleryMedia.Type.IMAGE
+    } else {
+        GalleryMedia.Type.VIDEO
+    }

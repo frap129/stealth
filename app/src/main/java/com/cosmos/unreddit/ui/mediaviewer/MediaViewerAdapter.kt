@@ -145,7 +145,7 @@ class MediaViewerAdapter(
                                 }
                             }
                         )
-                        target { drawable -> setImageDrawable(drawable) }
+                        target(binding.image)
                     }.build()
                 )
             }
