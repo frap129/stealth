@@ -294,12 +294,12 @@ class GraphQlPostMapperTest {
         assertTrue(actualPost.isVideo)
         assertEquals(MediaType.REDDIT_VIDEO, actualPost.mediaType)
         assertEquals("video", actualMedia.type)
-        assertEquals("https://v.redd.it/x/DASHPlaylist.mpd", actualVideo.fallbackUrl)
+        assertEquals("https://v.redd.it/x/HLSPlaylist.m3u8", actualVideo.fallbackUrl)
         assertEquals(640, actualVideo.width)
         assertEquals(360, actualVideo.height)
         assertEquals(12, actualVideo.duration)
         assertFalse(actualVideo.isGif)
-        assertEquals("https://v.redd.it/x/DASHPlaylist.mpd", actualPost.mediaUrl)
+        assertEquals("https://v.redd.it/x/HLSPlaylist.m3u8", actualPost.mediaUrl)
         assertNull(LinkUtil.getRedditSoundTrack(actualPost.mediaUrl))
     }
 
@@ -667,7 +667,7 @@ class GraphQlPostMapperTest {
     }
 
     @Test
-    fun `prefers dash manifest when packaged mp4 has lower resolution than source`() {
+    fun `prefers hls manifest when packaged mp4 has lower resolution than source`() {
         val inputJson: String =
             """
             {"data":{"postsInfoByIds":[{
@@ -715,11 +715,11 @@ class GraphQlPostMapperTest {
         val actualPost: PostData = inputMapper.toPostData(inputNode)
         val actualVideo: RedditVideoPreview =
             requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
-        val expectedDashUrl: String =
-            "https://v.redd.it/8yf4auqn4x3i1/DASHPlaylist.mpd?f=hd%2CsubsAll%2ChlsSpecOrder%2Cvp9&v=1&a=1798301895%2CYzBkYmQwZDlmMGZmODI1ZGQxZDVmY2I1NDkyODFiZDNlY2E3MmJkMDFhYWJhMWYyZDQ5YTE4OTExMTEwZjIzZA%3D%3D"
+        val expectedHlsUrl: String =
+            "https://v.redd.it/8yf4auqn4x3i1/HLSPlaylist.m3u8?f=hd%2CsubsAll%2ChlsSpecOrder%2Cvp9&v=1&a=1798301895%2CYzI2NmE5MjJhZjk1MWZlYTFkZWZjOTc1NzgyNGJkMzJkYzc3MjI4ZTY1NThiNTRjZWYxNzFkZWVmYjVjY2U4Nw%3D%3D"
 
-        assertEquals(expectedDashUrl, actualVideo.fallbackUrl)
-        assertEquals(expectedDashUrl, actualPost.mediaUrl)
+        assertEquals(expectedHlsUrl, actualVideo.fallbackUrl)
+        assertEquals(expectedHlsUrl, actualPost.mediaUrl)
     }
 
     @Test
@@ -1083,7 +1083,7 @@ class GraphQlPostMapperTest {
     }
 
     @Test
-    fun `falls back to dash manifest without packaged media`() {
+    fun `falls back to hls manifest without packaged media`() {
         val inputNode: GraphQlPostNode =
             GraphQlPostNode(
                 id = "t3_video",
@@ -1124,8 +1124,46 @@ class GraphQlPostMapperTest {
 
         assertTrue(actualPost.isVideo)
         assertEquals(MediaType.REDDIT_VIDEO, actualPost.mediaType)
-        assertEquals("https://v.redd.it/video/DASHPlaylist.mpd", actualVideo.fallbackUrl)
+        assertEquals("https://v.redd.it/video/HLSPlaylist.m3u8", actualVideo.fallbackUrl)
         assertNull(LinkUtil.getRedditSoundTrack(actualPost.mediaUrl))
+    }
+
+    @Test
+    fun `falls back to dash when hls is unusable`() {
+        val inputDashUrl: String = "https://v.redd.it/video/DASHPlaylist.mpd?f=hd"
+        val inputHlsUrls: List<String?> =
+            listOf(
+                null,
+                "",
+                "not-a-url",
+                "https://v.redd.it/video/HLSPlaylist.mp4",
+                "https://example.com/video/HLSPlaylist.m3u8",
+            )
+
+        inputHlsUrls.forEach { inputHlsUrl: String? ->
+            val inputNode: GraphQlPostNode =
+                GraphQlPostNode(
+                    id = "t3_video",
+                    postTitle = "A video",
+                    permalink = "/r/Android/comments/video/a_video/",
+                    url = "https://v.redd.it/video",
+                    domain = "v.redd.it",
+                    createdAt = CREATED_AT,
+                    media =
+                        GraphQlMedia(
+                            streaming =
+                                GraphQlStreaming(
+                                    dashUrl = inputDashUrl,
+                                    hlsUrl = inputHlsUrl,
+                                ),
+                        ),
+                )
+            val actualPost: PostData = GraphQlPostMapper().toPostData(inputNode)
+            val actualVideo: RedditVideoPreview =
+                requireNotNull(requireNotNull(actualPost.media).redditVideoPreview)
+
+            assertEquals(inputDashUrl, actualVideo.fallbackUrl)
+        }
     }
 
     @Test
@@ -1288,7 +1326,7 @@ class GraphQlPostMapperTest {
         assertTrue(requireNotNull(actualPost.isRedditGallery))
         assertEquals(1200, actualPreviewSource.width)
         assertEquals(800, actualPreviewSource.height)
-        assertEquals("https://v.redd.it/nested/DASHPlaylist.mpd", actualVideo.fallbackUrl)
+        assertEquals("https://v.redd.it/nested/HLSPlaylist.m3u8", actualVideo.fallbackUrl)
         assertEquals(640, actualVideo.width)
         assertEquals(360, actualVideo.height)
         assertEquals("First", actualGalleryItem.caption)

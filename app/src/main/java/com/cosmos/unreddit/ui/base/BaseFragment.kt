@@ -110,7 +110,7 @@ open class BaseFragment : Fragment(), PostListAdapter.PostClickListener,
         }
     }
 
-    override fun onVideoClick(post: PostEntity) {
+    open override fun onVideoClick(post: PostEntity) {
         viewModel?.insertPostInHistory(post.id)
         linkHandler.openMedia(post.mediaUrl, post.mediaType)
     }

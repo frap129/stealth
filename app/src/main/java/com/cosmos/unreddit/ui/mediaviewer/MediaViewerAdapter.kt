@@ -27,6 +27,17 @@ import com.google.android.exoplayer2.upstream.HttpDataSource
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.HttpURLConnection
 
+internal class DashFallbackState {
+    private var isTried: Boolean = false
+
+    fun getUrl(videoUrl: String): String? {
+        if (isTried) return null
+        val dashUrl: String = LinkUtil.getRedditDashFallback(videoUrl) ?: return null
+        isTried = true
+        return dashUrl
+    }
+}
+
 class MediaViewerAdapter(
     context: Context,
     var muteVideo: Boolean,
@@ -90,6 +101,11 @@ class MediaViewerAdapter(
         }
         players.clear()
         exoPlayerHelper.clearCache()
+    }
+
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        (holder as? VideoViewHolder)?.release()
+        super.onViewRecycled(holder)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -180,9 +196,12 @@ class MediaViewerAdapter(
 
     inner class VideoViewHolder(
         private val binding: ItemVideoBinding
-    ) : RecyclerView.ViewHolder(binding.root), Player.Listener {
+    ) : RecyclerView.ViewHolder(binding.root) {
+
+        private var activePlayer: SimpleExoPlayer? = null
 
         fun bind(video: GalleryMedia) {
+            release()
             val url = video.url.toHttpUrlOrNull() ?: return
 
             if (url.host.contains("redgifs", ignoreCase = true)) {
@@ -193,9 +212,8 @@ class MediaViewerAdapter(
                 exoPlayerHelper.setRequestProperties(requestProperties)
             }
 
-            val player = SimpleExoPlayer.Builder(binding.video.context)
-                .setMediaSourceFactory(exoPlayerHelper.defaultMediaSourceFactory)
-                .build()
+            val player = exoPlayerHelper.createPlayer(binding.video.context, video.url)
+            activePlayer = player
 
             val videoItem = exoPlayerHelper.getMediaItem(video.url)
 
@@ -209,6 +227,7 @@ class MediaViewerAdapter(
                 // Add special listener for Reddit videos with audio
                 player.addListener(object : Player.Listener {
                     override fun onPlayerError(error: PlaybackException) {
+                        if (binding.video.player !== player) return
                         if (isErrorFromAudio(error)) {
                             // Retry without audio if an error is thrown
                             player.setMediaItem(videoItem)
@@ -219,18 +238,30 @@ class MediaViewerAdapter(
                     }
 
                     override fun onTracksChanged(tracks: Tracks) {
+                        if (binding.video.player !== player) return
                         initAudioVolume(tracks)
                     }
                 })
             } else {
+                val dashFallbackState = DashFallbackState()
                 player.setMediaSource(exoPlayerHelper.getMediaSource(videoItem))
-                player.addListener(this)
-            }
+                player.addListener(object : Player.Listener {
+                    override fun onPlayerError(error: PlaybackException) {
+                        if (binding.video.player !== player) return
+                        val dashUrl: String? = dashFallbackState.getUrl(video.url)
+                        if (dashUrl != null) {
+                            player.setMediaItem(exoPlayerHelper.getMediaItem(dashUrl))
+                            player.prepare()
+                            return
+                        }
+                        binding.infoRetry.show()
+                    }
 
-            player.apply {
-                repeatMode = Player.REPEAT_MODE_ALL
-                prepare()
-                play()
+                    override fun onTracksChanged(tracks: Tracks) {
+                        if (binding.video.player !== player) return
+                        initAudioVolume(tracks)
+                    }
+                })
             }
 
             players.add(player)
@@ -242,7 +273,23 @@ class MediaViewerAdapter(
                 }
             }
 
+            player.apply {
+                repeatMode = Player.REPEAT_MODE_ALL
+                prepare()
+                play()
+            }
+
             binding.infoRetry.setActionClickListener { player.prepare() }
+        }
+
+        fun release() {
+            binding.video.player = null
+            activePlayer?.let { player ->
+                if (players.remove(player)) {
+                    player.release()
+                }
+            }
+            activePlayer = null
         }
 
         private fun isErrorFromAudio(error: PlaybackException): Boolean {
@@ -286,12 +333,5 @@ class MediaViewerAdapter(
             return false
         }
 
-        override fun onPlayerError(error: PlaybackException) {
-            binding.infoRetry.show()
-        }
-
-        override fun onTracksChanged(tracks: Tracks) {
-            initAudioVolume(tracks)
-        }
     }
 }

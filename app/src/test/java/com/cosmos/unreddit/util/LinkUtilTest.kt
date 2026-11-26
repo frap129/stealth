@@ -104,6 +104,58 @@ class LinkUtilTest {
     }
 
     @Test
+    fun `detects reddit streaming manifests and rejects external hosts`() {
+        assertTrue(
+            LinkUtil.isRedditStreamingManifest(
+                "https://v.redd.it/video/HLSPlaylist.m3u8?f=hd",
+            ),
+        )
+        assertTrue(
+            LinkUtil.isRedditStreamingManifest(
+                "https://v.redd.it/video/DASHPlaylist.mpd?f=hd",
+            ),
+        )
+        assertFalse(
+            LinkUtil.isRedditStreamingManifest(
+                "https://example.com/video/HLSPlaylist.m3u8",
+            ),
+        )
+        assertFalse(
+            LinkUtil.isRedditStreamingManifest(
+                "https://v.redd.it/video/CMAF_720.mp4",
+            ),
+        )
+        assertFalse(LinkUtil.isRedditStreamingManifest(""))
+    }
+
+    @Test
+    fun `builds dash fallback from reddit hls preserving query`() {
+        val inputLink: String =
+            "https://v.redd.it/video/HLSPlaylist.m3u8?f=hd&a=token"
+        val expectedLink: String =
+            "https://v.redd.it/video/DASHPlaylist.mpd?f=hd&a=token"
+
+        val actualLink: String? = LinkUtil.getRedditDashFallback(inputLink)
+
+        assertEquals(expectedLink, actualLink)
+    }
+
+    @Test
+    fun `returns null dash fallback for non reddit or non hls urls`() {
+        assertNull(
+            LinkUtil.getRedditDashFallback(
+                "https://v.redd.it/video/DASHPlaylist.mpd?f=hd",
+            ),
+        )
+        assertNull(
+            LinkUtil.getRedditDashFallback(
+                "https://example.com/video/HLSPlaylist.m3u8",
+            ),
+        )
+        assertNull(LinkUtil.getRedditDashFallback(""))
+    }
+
+    @Test
     fun `detects gif urls without mistaking mp4 responses for gifs`() {
         assertTrue(LinkUtil.isGifUrl("https://i.redd.it/a.gif"))
         assertTrue(LinkUtil.isGifUrl("https://cf.preview.redd.it/a.gif?auto=webp&s=abc"))

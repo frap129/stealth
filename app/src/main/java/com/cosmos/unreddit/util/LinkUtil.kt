@@ -28,9 +28,15 @@ object LinkUtil {
     private const val REDDIT_SOUNDTRACK_NAME: String = "_AUDIO_128"
     private const val MANIFEST_MPD_EXTENSION: String = ".mpd"
     private const val MANIFEST_HLS_EXTENSION: String = ".m3u8"
+    private const val REDDIT_VIDEO_HOST: String = "v.redd.it"
+    private const val REDDIT_PACKAGED_MEDIA_HOST: String = "packaged-media.redd.it"
+    private const val DASH_PLAYLIST_NAME: String = "DASHPlaylist.mpd"
+    private const val HLS_PLAYLIST_NAME: String = "HLSPlaylist.m3u8"
     private const val REDDIT_PREVIEW_DOMAIN: String = "preview.redd.it"
     private const val GIF_PATH_EXTENSION: String = ".gif"
     private const val ANIMATED_MP4_FORMAT: String = "mp4"
+    private val REDDIT_VIDEO_HOSTS: Set<String> =
+        setOf(REDDIT_VIDEO_HOST, REDDIT_PACKAGED_MEDIA_HOST)
 
     val String.https: String
         get() = this.replace(HTTP_REGEX, "https")
@@ -84,6 +90,25 @@ object LinkUtil {
         val path = link.toHttpUrlOrNull()?.encodedPath ?: return false
         return path.endsWith(MANIFEST_MPD_EXTENSION, ignoreCase = true) ||
             path.endsWith(MANIFEST_HLS_EXTENSION, ignoreCase = true)
+    }
+
+    fun isRedditVideoHost(link: String): Boolean =
+        link.toHttpUrlOrNull()?.host in REDDIT_VIDEO_HOSTS
+
+    fun isRedditStreamingManifest(link: String): Boolean {
+        val url = link.toHttpUrlOrNull() ?: return false
+        if (url.host !in REDDIT_VIDEO_HOSTS) return false
+        return url.encodedPath.endsWith(MANIFEST_MPD_EXTENSION, ignoreCase = true) ||
+            url.encodedPath.endsWith(MANIFEST_HLS_EXTENSION, ignoreCase = true)
+    }
+
+    fun getRedditDashFallback(link: String): String? {
+        val url = link.toHttpUrlOrNull() ?: return null
+        if (url.host != REDDIT_VIDEO_HOST) return null
+        if (!url.encodedPath.endsWith(HLS_PLAYLIST_NAME, ignoreCase = true)) return null
+        // Reddit accepts the same signed query on the DASH manifest.
+        val dashPath = url.encodedPath.dropLast(HLS_PLAYLIST_NAME.length) + DASH_PLAYLIST_NAME
+        return url.newBuilder().encodedPath(dashPath).build().toString()
     }
 
     fun isRedditPreviewUrl(link: String): Boolean {

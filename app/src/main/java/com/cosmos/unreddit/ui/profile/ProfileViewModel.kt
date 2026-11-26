@@ -1,5 +1,6 @@
 package com.cosmos.unreddit.ui.profile
 
+import com.cosmos.unreddit.data.local.mapper.PostMapper2
 import com.cosmos.unreddit.data.local.mapper.SavedMapper2
 import com.cosmos.unreddit.data.model.Comment
 import com.cosmos.unreddit.data.model.SavedItem
@@ -10,8 +11,10 @@ import com.cosmos.unreddit.data.repository.PostListRepository
 import com.cosmos.unreddit.data.repository.PreferencesRepository
 import com.cosmos.unreddit.di.DispatchersModule.DefaultDispatcher
 import com.cosmos.unreddit.ui.base.BaseViewModel
+import com.cosmos.unreddit.util.PostUtil
 import com.cosmos.unreddit.util.extension.updateValue
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -20,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.combineTransform
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -28,8 +32,9 @@ import javax.inject.Inject
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     preferencesRepository: PreferencesRepository,
-    repository: PostListRepository,
+    private val repository: PostListRepository,
     private val savedMapper: SavedMapper2,
+    private val postMapper: PostMapper2,
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher
 ) : BaseViewModel(preferencesRepository, repository) {
 
@@ -85,5 +90,16 @@ class ProfileViewModel @Inject constructor(
 
     fun setPage(position: Int) {
         _page.updateValue(position)
+    }
+
+    suspend fun refreshPost(post: PostEntity): PostEntity {
+        return runCatching {
+            repository.getPost(post.permalink, post.suggestedSorting)
+                .first()
+                .let { postMapper.dataToEntity(PostUtil.getPostData(it)) }
+        }.getOrElse { throwable ->
+            if (throwable is CancellationException) throw throwable
+            post
+        }
     }
 }

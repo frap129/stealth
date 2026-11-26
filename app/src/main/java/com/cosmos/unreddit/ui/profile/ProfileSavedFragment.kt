@@ -13,6 +13,8 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.cosmos.unreddit.R
 import com.cosmos.unreddit.data.model.Comment
+import com.cosmos.unreddit.data.model.MediaType
+import com.cosmos.unreddit.data.model.db.PostEntity
 import com.cosmos.unreddit.ui.commentmenu.CommentMenuFragment
 import com.cosmos.unreddit.ui.common.fragment.ListFragment
 import com.cosmos.unreddit.ui.postdetails.PostDetailsFragment
@@ -80,6 +82,16 @@ class ProfileSavedFragment : ListFragment<ProfileSavedAdapter>(),
             )
             ?.addToBackStack(null)
             ?.commit()
+    }
+
+    override fun onVideoClick(post: PostEntity) {
+        if (post.mediaType != MediaType.REDDIT_VIDEO && post.mediaType != MediaType.REDDIT_GIF) {
+            super.onVideoClick(post)
+            return
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            super.onVideoClick(viewModel.refreshPost(post))
+        }
     }
 
     override fun onLongClick(comment: Comment.CommentEntity) {

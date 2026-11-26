@@ -116,9 +116,10 @@ class GraphQlPostMapper @Inject constructor() {
     private fun GraphQlMedia.selectPlaybackUrl(streaming: GraphQlStreaming?): String? {
         val packagedPlayback: GraphQlPlaybackPermutation? = highestResolutionPackagedPlayback()
         val packagedUrl: String? = packagedPlayback?.source?.url
+        // Reddit exposes higher renditions in HLS than DASH for some videos.
         val manifestUrl: String? =
-            streaming?.dashUrl?.takeIf { url: String -> url.isPlayableManifest(".mpd") }
-                ?: streaming?.hlsUrl?.takeIf { url: String -> url.isPlayableManifest(".m3u8") }
+            streaming?.hlsUrl?.takeIf { url: String -> url.isPlayableManifest(".m3u8") }
+                ?: streaming?.dashUrl?.takeIf { url: String -> url.isPlayableManifest(".mpd") }
         return if (streaming.hasHigherResolutionThan(packagedPlayback)) {
             manifestUrl ?: packagedUrl
         } else {
@@ -168,13 +169,13 @@ class GraphQlPostMapper @Inject constructor() {
 
     private fun String.isProgressiveRedditMp4(): Boolean {
         val url = toHttpUrlOrNull() ?: return false
-        return url.host in REDDIT_VIDEO_HOSTS &&
+        return LinkUtil.isRedditVideoHost(this) &&
             url.encodedPath.endsWith(".mp4", ignoreCase = true)
     }
 
     private fun String.isPlayableManifest(extension: String): Boolean {
         val url = toHttpUrlOrNull() ?: return false
-        return url.host in REDDIT_VIDEO_HOSTS &&
+        return LinkUtil.isRedditVideoHost(this) &&
             url.encodedPath.endsWith(extension, ignoreCase = true)
     }
 
@@ -247,7 +248,5 @@ class GraphQlPostMapper @Inject constructor() {
 
     private companion object {
         private const val NO_RESOLUTION_AREA: Long = 0L
-        private val REDDIT_VIDEO_HOSTS: Set<String> =
-            setOf("v.redd.it", "packaged-media.redd.it")
     }
 }
