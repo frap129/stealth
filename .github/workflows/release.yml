@@ -1,0 +1,107 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Derive version
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          pattern='^v([0-9]+)\.([0-9]+)\.([0-9]+)(-(alpha|beta|rc)\.([0-9]+))?$'
+          if [[ ! "$TAG" =~ $pattern ]]; then
+            echo "::error::Tag $TAG must match vX.Y.Z or vX.Y.Z-(alpha|beta|rc).N"
+            exit 1
+          fi
+          major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} patch=${BASH_REMATCH[3]}
+          stage=${BASH_REMATCH[5]} number=${BASH_REMATCH[6]}
+          if (( 10#$minor > 99 || 10#$patch > 99 )); then
+            echo "::error::Minor and patch must be at most 99"
+            exit 1
+          fi
+          # Each stage owns 333 version-code slots (alpha 0-332, beta 333-665,
+          # rc 666-998) and the final release takes 999, so every prerelease of
+          # a version sorts below the release and below the next version.
+          if [[ -z "$stage" ]]; then
+            slot=999
+          else
+            if (( 10#$number < 1 || 10#$number > 333 )); then
+              echo "::error::Prerelease number must be between 1 and 333"
+              exit 1
+            fi
+            case "$stage" in
+              alpha) base=0 ;;
+              beta) base=333 ;;
+              rc) base=666 ;;
+            esac
+            slot=$(( base + 10#$number - 1 ))
+          fi
+          {
+            echo "name=${TAG#v}"
+            echo "code=$(( (10#$major * 10000 + 10#$minor * 100 + 10#$patch) * 1000 + slot ))"
+            echo "prerelease=$([[ -n "$stage" ]] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+          cache: gradle
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+      - name: Check
+        run: bash ./gradlew testDebugUnitTest
+      - name: Write signing config
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing secret $name"
+              exit 1
+            fi
+          done
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > keystore.properties
+      - name: Build
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: bash ./gradlew :app:assembleRelease :app:bundleRelease -PversionName="$VERSION_NAME" -PversionCode="$VERSION_CODE"
+      - name: Remove signing config
+        if: always()
+        run: rm -f keystore.properties "$RUNNER_TEMP/release.jks"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          outputs=app/build/outputs
+          cp "$outputs/apk/release/app-release.apk" "stealth-$VERSION_NAME.apk"
+          cp "$outputs/bundle/release/app-release.aab" "stealth-$VERSION_NAME.aab"
+          cp "$outputs/mapping/release/mapping.txt" "stealth-$VERSION_NAME-mapping.txt"
+          flags=(--generate-notes --verify-tag)
+          [[ "$PRERELEASE" == true ]] && flags+=(--prerelease)
+          gh release create "$TAG" "${flags[@]}" \
+            "stealth-$VERSION_NAME.apk" "stealth-$VERSION_NAME.aab" "stealth-$VERSION_NAME-mapping.txt"

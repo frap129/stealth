@@ -30,8 +30,8 @@ android {
         minSdk = Config.minSdk
         targetSdk = Config.targetSdk
 
-        versionCode = Config.versionCode
-        versionName = Config.versionName
+        versionCode = providers.gradleProperty("versionCode").map(String::toInt).getOrElse(Config.versionCode)
+        versionName = providers.gradleProperty("versionName").getOrElse(Config.versionName)
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
