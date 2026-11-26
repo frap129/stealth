@@ -58,6 +58,7 @@ data class GraphQlMedia(
 @JsonClass(generateAdapter = true)
 data class GraphQlAnimatedMedia(
     @Json(name = "mp4_source") val mp4Source: GraphQlMediaSource? = null,
+    @Json(name = "gif_source") val gifSource: GraphQlMediaSource? = null,
 )
 
 @JsonClass(generateAdapter = true)

@@ -357,10 +357,10 @@ class GraphQlPostMapperTest {
               "domain":"i.redd.it",
               "createdAt":"$CREATED_AT",
               "media":{
-                "still":{"source":{"dimensions":{"width":640,"height":400},"url":"https://preview.redd.it/5apc9mfquqyd1.gif?format=png8&s=700b39e539a15a2c4817dad73d7c89513d07f27b"}},
+                "still":{"source":{"dimensions":{"width":640,"height":400},"url":"$STILL_PREVIEW_URL"}},
                 "animated":{
-                  "gif_source":{"dimensions":{"width":640,"height":400},"url":"https://preview.redd.it/5apc9mfquqyd1.gif?auto=webp&s=7ccc503778cef711eab7eb64f31060950533e31f"},
-                  "mp4_source":{"dimensions":{"width":640,"height":400},"url":"https://preview.redd.it/5apc9mfquqyd1.gif?width=640&format=mp4&s=ed0f929510cbbc12a3d7edd2be914037900ce959"}
+                  "gif_source":{"dimensions":{"width":640,"height":400},"url":"$ANIMATED_GIF_URL"},
+                  "mp4_source":{"dimensions":{"width":640,"height":400},"url":"$ANIMATED_MP4_URL"}
                 }
               }
             }]}}
@@ -378,13 +378,50 @@ class GraphQlPostMapperTest {
         assertTrue(actualPost.isVideo)
         assertEquals(MediaType.REDDIT_GIF, actualPost.mediaType)
         assertTrue(actualVideo.isGif)
-        assertEquals(
-            "https://preview.redd.it/5apc9mfquqyd1.gif?width=640&format=mp4&s=ed0f929510cbbc12a3d7edd2be914037900ce959",
-            actualVideo.fallbackUrl,
-        )
+        assertEquals(ANIMATED_MP4_URL, actualVideo.fallbackUrl)
         assertEquals(actualVideo.fallbackUrl, actualPost.mediaUrl)
+        assertEquals(ANIMATED_GIF_URL, actualPost.previewUrl)
         assertEquals(640, actualVideo.width)
         assertEquals(400, actualVideo.height)
+    }
+
+    @Test
+    fun `falls back to the still preview when the animated gif host is not reddit`() {
+        val inputStillUrl: String =
+            "https://cf.preview.redd.it/5apc9mfquqyd1.gif?format=png8&s=abc"
+        val inputNode: GraphQlPostNode =
+            GraphQlPostNode(
+                id = "t3_foreign_preview",
+                postTitle = "A gif",
+                permalink = "/r/Android/comments/gif/a_gif/",
+                url = "https://i.redd.it/5apc9mfquqyd1.gif",
+                domain = "i.redd.it",
+                createdAt = CREATED_AT,
+                media =
+                    GraphQlMedia(
+                        still =
+                            GraphQlStill(
+                                source =
+                                    GraphQlMediaSource(
+                                        url = inputStillUrl,
+                                        dimensions = GraphQlDimensions(width = 640, height = 400),
+                                    ),
+                            ),
+                        animated =
+                            GraphQlAnimatedMedia(
+                                gifSource =
+                                    GraphQlMediaSource(
+                                        url = "https://example.com/a.gif?auto=webp",
+                                        dimensions = GraphQlDimensions(width = 640, height = 400),
+                                    ),
+                            ),
+                    ),
+            )
+        val actualPost: PostData = GraphQlPostMapper().toPostData(inputNode)
+        val expectedPreviewUrl: String =
+            "https://cf.preview.redd.it/5apc9mfquqyd1.gif?format=png8&s=abc"
+
+        assertEquals(expectedPreviewUrl, actualPost.previewUrl)
     }
 
     @Test
@@ -1279,20 +1316,34 @@ class GraphQlPostMapperTest {
         assertTrue(actualPost.isStickied)
     }
 
-    private fun animatedRedditGif(url: String): GraphQlAnimatedMedia =
+    private fun animatedRedditGif(
+        mp4Url: String = ANIMATED_MP4_URL,
+        gifUrl: String? = ANIMATED_GIF_URL,
+    ): GraphQlAnimatedMedia =
         GraphQlAnimatedMedia(
             mp4Source =
                 GraphQlMediaSource(
-                    url = url,
+                    url = mp4Url,
                     dimensions = GraphQlDimensions(width = 640, height = 400),
                 ),
+            gifSource =
+                gifUrl?.let { url: String ->
+                    GraphQlMediaSource(
+                        url = url,
+                        dimensions = GraphQlDimensions(width = 640, height = 400),
+                    )
+                },
         )
 
     private companion object {
         private const val CREATED_AT: String = "2026-10-07T15:47:48.255000+0000"
         private const val EXPECTED_CREATED_AT_SECONDS: Long = 1791388068L
         private const val INVALID_EPOCH_SECONDS: Long = 0L
+        private const val STILL_PREVIEW_URL: String =
+            "https://cf.preview.redd.it/5apc9mfquqyd1.gif?format=png8&s=700b39e539a15a2c4817dad73d7c89513d07f27b"
+        private const val ANIMATED_GIF_URL: String =
+            "https://cf.preview.redd.it/5apc9mfquqyd1.gif?auto=webp&s=7ccc503778cef711eab7eb64f31060950533e31f"
         private const val ANIMATED_MP4_URL: String =
-            "https://preview.redd.it/5apc9mfquqyd1.gif?width=640&format=mp4&s=ed0f929510cbbc12a3d7edd2be914037900ce959"
+            "https://cf.preview.redd.it/5apc9mfquqyd1.gif?width=640&format=mp4&s=ed0f929510cbbc12a3d7edd2be914037900ce959"
     }
 }

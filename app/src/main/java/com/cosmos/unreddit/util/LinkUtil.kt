@@ -28,9 +28,9 @@ object LinkUtil {
     private const val REDDIT_SOUNDTRACK_NAME: String = "_AUDIO_128"
     private const val MANIFEST_MPD_EXTENSION: String = ".mpd"
     private const val MANIFEST_HLS_EXTENSION: String = ".m3u8"
-    private const val REDDIT_PREVIEW_HOST: String = "preview.redd.it"
+    private const val REDDIT_PREVIEW_DOMAIN: String = "preview.redd.it"
+    private const val GIF_PATH_EXTENSION: String = ".gif"
     private const val ANIMATED_MP4_FORMAT: String = "mp4"
-    private const val ANIMATED_MP4_PATH_EXTENSION: String = ".gif"
 
     val String.https: String
         get() = this.replace(HTTP_REGEX, "https")
@@ -86,12 +86,27 @@ object LinkUtil {
             path.endsWith(MANIFEST_HLS_EXTENSION, ignoreCase = true)
     }
 
+    fun isRedditPreviewUrl(link: String): Boolean {
+        val url: HttpUrl = link.toHttpUrlOrNull() ?: return false
+        return url.isRedditPreview()
+    }
+
+    fun isGifUrl(link: String): Boolean {
+        val url: HttpUrl = link.toHttpUrlOrNull() ?: return false
+        val isMp4: Boolean =
+            url.queryParameter("format").equals(ANIMATED_MP4_FORMAT, ignoreCase = true)
+        return url.encodedPath.endsWith(GIF_PATH_EXTENSION, ignoreCase = true) && !isMp4
+    }
+
     fun isAnimatedRedditMp4(link: String): Boolean {
         val url: HttpUrl = link.toHttpUrlOrNull() ?: return false
-        return url.host == REDDIT_PREVIEW_HOST &&
-            url.encodedPath.endsWith(ANIMATED_MP4_PATH_EXTENSION, ignoreCase = true) &&
+        return url.isRedditPreview() &&
+            url.encodedPath.endsWith(GIF_PATH_EXTENSION, ignoreCase = true) &&
             url.queryParameter("format").equals(ANIMATED_MP4_FORMAT, ignoreCase = true)
     }
+
+    private fun HttpUrl.isRedditPreview(): Boolean =
+        host == REDDIT_PREVIEW_DOMAIN || host.endsWith(".$REDDIT_PREVIEW_DOMAIN")
 
     fun getGfycatId(link: String): String {
         return link.toHttpUrlOrNull()?.pathSegments?.lastOrNull() ?: return link

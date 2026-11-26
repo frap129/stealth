@@ -72,20 +72,44 @@ class LinkUtilTest {
     }
 
     @Test
-    fun `detects animated reddit mp4 urls`() {
-        val inputLink: String =
+    fun `detects animated reddit mp4 urls on preview hosts`() {
+        val inputPreviousHostLink: String =
             "https://preview.redd.it/5apc9mfquqyd1.gif?width=640&format=mp4&s=abc"
+        val inputCurrentHostLink: String =
+            "https://cf.preview.redd.it/5apc9mfquqyd1.gif?width=640&format=mp4&s=abc"
 
-        val actualIsAnimatedMp4: Boolean = LinkUtil.isAnimatedRedditMp4(inputLink)
+        val actualPreviousHostResult: Boolean = LinkUtil.isAnimatedRedditMp4(inputPreviousHostLink)
+        val actualCurrentHostResult: Boolean = LinkUtil.isAnimatedRedditMp4(inputCurrentHostLink)
 
-        assertTrue(actualIsAnimatedMp4)
+        assertTrue(actualPreviousHostResult)
+        assertTrue(actualCurrentHostResult)
     }
 
     @Test
     fun `rejects non animated reddit mp4 urls`() {
         assertFalse(LinkUtil.isAnimatedRedditMp4("https://preview.redd.it/a.gif?format=png8"))
+        assertFalse(LinkUtil.isAnimatedRedditMp4("https://cf.preview.redd.it/a.gif?format=png8"))
         assertFalse(LinkUtil.isAnimatedRedditMp4("https://example.com/a.gif?format=mp4"))
         assertFalse(LinkUtil.isAnimatedRedditMp4("https://preview.redd.it/a.mp4?format=mp4"))
         assertFalse(LinkUtil.isAnimatedRedditMp4(""))
+    }
+
+    @Test
+    fun `accepts reddit preview hosts and rejects lookalikes`() {
+        assertTrue(LinkUtil.isRedditPreviewUrl("https://preview.redd.it/a.gif"))
+        assertTrue(LinkUtil.isRedditPreviewUrl("https://cf.preview.redd.it/a.gif"))
+        assertFalse(LinkUtil.isRedditPreviewUrl("https://preview.redd.it.example.com/a.gif"))
+        assertFalse(LinkUtil.isRedditPreviewUrl("https://evilpreview.redd.it/a.gif"))
+        assertFalse(LinkUtil.isRedditPreviewUrl(""))
+    }
+
+    @Test
+    fun `detects gif urls without mistaking mp4 responses for gifs`() {
+        assertTrue(LinkUtil.isGifUrl("https://i.redd.it/a.gif"))
+        assertTrue(LinkUtil.isGifUrl("https://cf.preview.redd.it/a.gif?auto=webp&s=abc"))
+        assertFalse(LinkUtil.isGifUrl("https://cf.preview.redd.it/a.gif?format=mp4&s=abc"))
+        assertFalse(LinkUtil.isGifUrl("https://i.redd.it/a.gifv"))
+        assertFalse(LinkUtil.isGifUrl("https://i.redd.it/a.mp4"))
+        assertFalse(LinkUtil.isGifUrl(""))
     }
 }

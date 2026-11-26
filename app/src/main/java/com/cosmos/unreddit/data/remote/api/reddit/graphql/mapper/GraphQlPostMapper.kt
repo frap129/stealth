@@ -68,7 +68,11 @@ class GraphQlPostMapper @Inject constructor() {
     }
 
     private fun GraphQlMedia.toPreview(): MediaPreview? {
-        val source: GraphQlMediaSource = still?.source ?: return null
+        val animatedSource: GraphQlMediaSource? =
+            animated?.gifSource?.takeIf { source: GraphQlMediaSource ->
+                LinkUtil.isRedditPreviewUrl(source.url) && LinkUtil.isGifUrl(source.url)
+            }
+        val source: GraphQlMediaSource = animatedSource ?: still?.source ?: return null
         return MediaPreview(
             images = listOf(
                 Image(
